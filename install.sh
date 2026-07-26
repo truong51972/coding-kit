@@ -2,7 +2,7 @@
 
 set -eu
 
-REPOSITORY="truong51972/skills"
+REPOSITORY="truong51972/coding-kit"
 DEFAULT_REF="main"
 
 usage() {
