@@ -40,7 +40,7 @@ Skills are installed into `${AGENTS_HOME:-$HOME/.agents}/skills`.
 Install every skill from the latest `main` branch:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/skills/main/install.sh | sh -s -- --all
+curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh | sh -s -- --all
 ```
 
 ## Interactive selection
@@ -48,7 +48,7 @@ curl -fsSL https://raw.githubusercontent.com/truong51972/skills/main/install.sh 
 Run the installer without a selection to open a multi-select menu. The menu reads from `/dev/tty`, so it still works when the script itself is piped to `sh`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/skills/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh | sh
 ```
 
 If no TTY is available, pass `--all` or explicit skill names.
@@ -58,14 +58,14 @@ If no TTY is available, pass `--all` or explicit skill names.
 Install selected skills:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/skills/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh \
   | sh -s -- celery-worker context-management
 ```
 
 List the skills discovered on `main`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/skills/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh \
   | sh -s -- --list
 ```
 
@@ -74,7 +74,7 @@ curl -fsSL https://raw.githubusercontent.com/truong51972/skills/main/install.sh 
 Use `--ref` with a branch or tag. The installer downloads and scans that ref rather than relying on a fixed skill list:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/skills/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh \
   | sh -s -- --ref develop --all
 ```
 
@@ -83,7 +83,7 @@ curl -fsSL https://raw.githubusercontent.com/truong51972/skills/main/install.sh 
 Set `AGENTS_HOME` to install somewhere other than `~/.agents`:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/skills/main/install.sh \
+curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh \
   | AGENTS_HOME="$HOME/custom-agents" sh -s -- --all
 ```
 
@@ -104,7 +104,7 @@ Restart Codex or begin a new session after installing or updating skills.
 Clone the repository, then symlink each local skill into your agent home so edits are immediately available:
 
 ```sh
-git clone https://github.com/truong51972/skills.git
+git clone https://github.com/truong51972/coding-kit.git
 cd skills
 mkdir -p "${AGENTS_HOME:-$HOME/.agents}/skills"
 for skill_file in skills/*/SKILL.md; do
