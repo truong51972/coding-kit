@@ -79,7 +79,7 @@ class InitTests(unittest.TestCase):
             self.assertEqual(custom.read_text(encoding="utf-8"), "# Custom source priority\n")
             self.assertTrue((repo / ".agents" / "contexts" / "custom.md").exists())
 
-    def test_overwrite_replaces_templates_but_never_managed_block(self) -> None:
+    def test_overwrite_refuses_modified_shards_and_preserves_all_existing_content(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
             code, _data, output = run_context_ops(repo, "init")
@@ -90,10 +90,33 @@ class InitTests(unittest.TestCase):
                 "Keep developed conventions and credentials",
             )
             write(agents, developed)
-            write(
-                repo / ".agents" / "contexts" / "source-priority.md",
-                "# Replace me\n",
+            custom = repo / ".agents" / "contexts" / "source-priority.md"
+            write(custom, "# Keep me\n")
+            baseline = repo / ".agents" / "contexts" / "project-baseline.md"
+            baseline_before = baseline.read_bytes()
+
+            code, _data, output = run_context_ops(
+                repo,
+                "init",
+                "json",
+                "--overwrite",
             )
+
+            self.assertEqual(code, 2, output)
+            self.assertIn("refusing to overwrite modified context shard", output)
+            self.assertEqual(agents.read_text(encoding="utf-8"), developed)
+            self.assertEqual(custom.read_text(encoding="utf-8"), "# Keep me\n")
+            self.assertEqual(baseline.read_bytes(), baseline_before)
+
+    def test_overwrite_is_idempotent_when_existing_shards_match_templates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            code, _data, output = run_context_ops(repo, "init")
+            self.assertEqual(code, 0, output)
+            before = {
+                path.name: path.read_bytes()
+                for path in (repo / ".agents" / "contexts").glob("*.md")
+            }
 
             code, _data, output = run_context_ops(
                 repo,
@@ -103,13 +126,11 @@ class InitTests(unittest.TestCase):
             )
 
             self.assertEqual(code, 0, output)
-            self.assertEqual(agents.read_text(encoding="utf-8"), developed)
-            self.assertNotEqual(
-                (repo / ".agents" / "contexts" / "source-priority.md").read_text(
-                    encoding="utf-8"
-                ),
-                "# Replace me\n",
-            )
+            after = {
+                path.name: path.read_bytes()
+                for path in (repo / ".agents" / "contexts").glob("*.md")
+            }
+            self.assertEqual(after, before)
 
     def test_malformed_or_duplicate_markers_fail_without_partial_writes(self) -> None:
         malformed = (
