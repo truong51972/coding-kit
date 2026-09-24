@@ -53,7 +53,13 @@ workspace files actually exist.
 | Writing or reviewing a Compose service | [compose-patterns.md](references/compose-patterns.md) |
 | Adding a shared package or splitting a repo | [package-management.md](references/package-management.md) |
 
-## Repo Shape Convention
+## Recommended Shape for New or Restructured Repositories
+
+Preserve a coherent existing repository layout unless the task explicitly calls
+for restructuring. Do not migrate a repository merely to match this skill.
+
+When establishing a new monorepo, or when the existing repository has no stable
+layout convention, this shape is a reasonable default:
 
 ```text
 apps/<app>/          # Deployable applications
@@ -62,15 +68,11 @@ infra/compose/       # Compose fragments grouped by runtime concern
 compose.yaml         # Root include file
 ```
 
-Key rules:
-
-- Each Python app owns its own `pyproject.toml`.
-- Independent apps own their own `uv.lock`; share a root lockfile only when a
-  root workspace is real.
-- Compose fragments in `infra/compose/` use paths relative to that directory;
-  `../../` resolves to repo root.
-- Shared packages live under `packages/` with a real build backend and
-  `src/<import_name>` layout.
+Treat the shape as a recommendation rather than an invariant. Independently
+managed deployable apps usually benefit from their own `pyproject.toml` and
+lockfile. Use a shared root workspace only when the repository intentionally
+wants shared dependency resolution. Shared packages should be explicit package
+dependencies rather than ad-hoc `PYTHONPATH` or `sys.path` coupling.
 
 ## Packaging Decision Matrix
 
