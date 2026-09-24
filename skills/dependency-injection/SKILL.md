@@ -5,9 +5,11 @@ description: Design Python dependency injection across FastAPI, Celery, CLI, res
 
 # Dependency Injection Hub
 
-Use this skill for hybrid Python DI: framework-native dependencies at runtime
-edges, and `dependency-injector` for explicit application composition, shared
-object graphs, worker/CLI reuse, and resource lifecycle.
+Use this skill for Python dependency composition across runtime boundaries.
+Prefer framework-native dependency mechanisms at runtime edges. Use
+`dependency-injector` when the repository already uses it or when explicit
+cross-runtime composition, shared object graphs, worker/CLI reuse, or resource
+lifecycle justify the extra container.
 
 ## Ownership Boundary
 
@@ -22,14 +24,17 @@ Use a focused pointer instead of duplicating another skill:
   `python-monorepo-architecture`.
 - For durable `.agents/contexts/` memory, use `context-management`.
 
-Assume Python 3.10+, Pydantic v2, FastAPI lifespan, `dependency-injector` 4.x,
-and Celery 5.x unless the repo proves otherwise.
+Assume Python 3.10+, Pydantic v2, FastAPI lifespan, and Celery 5.x unless the
+repo proves otherwise. When `dependency-injector` is present, examples assume
+4.x.
 
 ## Reference Routing
 
-Always load [references/core.md](references/core.md) first.
+Load only the references needed for the task. Read
+[references/core.md](references/core.md) when container structure, provider
+selection, composition roots, or shared resource lifecycle is the issue.
 
-Load additional references only when relevant:
+Load runtime-specific references only when relevant:
 
 | Task | Reference |
 |---|---|
@@ -65,7 +70,10 @@ clients, and anything that needs teardown.
 
 ## FastAPI Integration Decision
 
-- Prefer `create_app()` + lifespan + `app.state.container` as the default.
+- If native FastAPI `Depends` and lifespan are sufficient, use them without an
+  external container.
+- When a shared container is justified, prefer `create_app()` + lifespan +
+  `app.state.container`.
 - Use FastAPI `Depends` for request-scoped state, auth, DB sessions, and cleanup.
 - Use `Provide[...]` only when the project already uses wiring heavily or
   clearly benefits from provider markers across many functions.

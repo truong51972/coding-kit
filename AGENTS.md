@@ -138,17 +138,21 @@ ownership and acceptance criteria. The primary agent handles these directly and
 may use at most one bounded subagent when isolated exploration, test work, or a
 fresh-context review materially improves confidence.
 
-Use the approved-plan execution skill for substantial, cross-boundary, or
-high-risk changes that already have an approved plan. Do not reconstruct an ad
-hoc swarm workflow.
+Use a planning-first workflow for substantial, cross-boundary, or high-risk
+changes. Investigate the current execution path and produce a concrete
+implementation plan before editing unless the user has already provided or
+approved one.
 
 An approved plan exists when the user explicitly approves it in the current
-conversation, asks to implement an existing named plan, provides an
-authoritative approved plan artifact, or explicitly invokes the approved-plan
-execution skill. Entering Plan mode alone does not authorize implementation.
+conversation, asks to implement an existing named plan, or provides an
+authoritative approved plan artifact. Entering Plan mode alone does not
+authorize implementation.
 
-When a task is too broad or risky for the standard workflow and no approved plan
-exists, investigate or produce a plan rather than initiating a swarm.
+Approval authorizes implementation of the scoped plan; it does not require a
+multi-agent pipeline. The primary agent may execute directly. Delegate only
+when bounded specialization, independent work, or fresh-context review
+materially improves confidence. If repository evidence materially invalidates
+the plan, stop and resolve the mismatch rather than silently redesigning it.
 
 ### Subagent delegation
 
@@ -158,7 +162,9 @@ sufficiently independent, and worth its coordination and token cost.
 Prefer subagents for context-heavy exploration, isolated implementation from an
 approved plan, independent test work, and fresh-context final review.
 
-Use the fewest agents necessary. Parallelize only independent read-heavy work.
+Use the fewest agents necessary. Do not hard-code a fixed subagent role pipeline;
+choose roles from the actual task boundaries. Parallelize only independent
+read-heavy work.
 Run agents sequentially when they share files, contracts, decisions, or mutable
 state. Unless explicitly justified, do not run more than two subagents
 concurrently.

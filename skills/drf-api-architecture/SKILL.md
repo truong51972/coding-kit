@@ -1,9 +1,9 @@
 ---
-name: drf-control-plane-api
-description: Use this skill when designing, reviewing, or refactoring Django REST Framework APIs that manage database-backed resources, permissions, workflows, state transitions, and async job triggers. Focus on thin API layers, explicit serializers, scoped object access, model/queryset correctness, and testable contracts.
+name: drf-api-architecture
+description: Design, review, and refactor production Django REST Framework APIs with thin API layers, explicit serializers, scoped object access, workflow boundaries, async job triggers, and testable contracts.
 ---
 
-# DRF Control Plane API
+# DRF API Architecture
 
 Use this skill for production Django REST Framework APIs where DRF acts as the application API boundary for resource management, authorization, workflow commands, and database-backed state.
 
