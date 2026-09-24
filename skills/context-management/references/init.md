@@ -59,5 +59,6 @@ the user provides it in the request or asks you to inspect source files.
   context layout.
 - Do not invent project-specific shards before the repo needs them.
 - Do not fill context files with placeholder prose that future sessions must clean up.
-- `--overwrite` applies only to starter shards; it never overwrites a developed
-  managed block.
+- `--overwrite` is compatibility-only. It may skip starter shards that still
+  match the shipped templates, but it must fail rather than overwrite any
+  modified/developed shard or managed block.
