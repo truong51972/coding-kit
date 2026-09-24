@@ -24,8 +24,16 @@ Document the repo-specific source-of-truth hierarchy here.
 ## Priority Order
 
 - Add project-specific source priority entries here when known.
+- Prefer explicit ownership and repository-defined precedence over timestamp,
+  file location, or whichever artifact changed most recently.
+- If priority is genuinely unresolved, record the ambiguity as an active
+  assumption or ask for clarification instead of inventing authority.
 
 ## Drift Handling
 
-- If two sources disagree, inspect the higher-priority owning source.
-- If source files supersede context, update context as current baseline during the next context sync.
+- If two sources disagree, identify which source owns the disputed fact and
+  apply the declared priority order.
+- Treat Git/mtime signals only as review candidates; they do not prove which
+  source is correct.
+- If an owning source supersedes context, update the affected shard as current
+  baseline during the next context sync.
