@@ -18,8 +18,9 @@ Celery testing.
 Use a focused pointer instead of duplicating another skill:
 
 - For Docker, Compose, uv, or import path issues, use `python-monorepo-architecture`.
-- For DI container scope, resource lifecycle, or test overrides, use
-  `dependency-injection`.
+- For DI container scope, provider lifecycle, fork-safe resource construction,
+  or test overrides, use `dependency-injection`. Keep this skill focused on
+  Celery-specific lifecycle constraints that affect worker behavior.
 - For `.agents/contexts/` startup memory, use `context-management`.
 
 ## Reference Routing
@@ -29,9 +30,6 @@ Load only the references needed for the task:
 - [configuration.md](references/configuration.md): Celery app factories,
   Pydantic settings, queues, routes, broker caveats, shutdown settings, and run
   commands.
-- [lifecycle-di.md](references/lifecycle-di.md): `dependency-injector`
-  containers, Celery worker signals, prefork safety, sync and async resource
-  lifecycle.
 - [tasks.md](references/tasks.md): thin task wrappers, Pydantic payloads,
   retries, acknowledgement policy, idempotency, Beat, and observability.
 - [testing.md](references/testing.md): service tests, task wrapper tests,
