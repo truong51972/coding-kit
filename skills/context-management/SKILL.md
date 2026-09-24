@@ -21,7 +21,9 @@ Never analyze or modify the rest of `AGENTS.md`; initialization may locate its
 H1 only to insert the managed block without changing surrounding bytes. Let
 source code, schemas, configuration, tests, and canonical documentation own
 their exact details. Treat source as authoritative whenever it conflicts with
-context.
+context. When two source artifacts disagree, resolve authority from explicit
+ownership and priority rules before deciding what context is stale; do not let
+recency alone choose the winner.
 
 ## Lifecycle
 
@@ -88,8 +90,13 @@ Treat `lint` as the hygiene gate and `validate` as the structure gate. Treat
 
 Static drift findings are candidates only. Git activity, mtimes, link checks,
 size, duplication, and identifier density do not establish semantic alignment.
-All JSON output must retain `semantic_source_verification.status:
-not_performed`.
+Drift checks are shard-local so a recently edited shard cannot hide an older
+stale shard. All JSON output must retain
+`semantic_source_verification.status: not_performed`.
+
+`init --overwrite` is retained only for compatibility. It may skip existing
+starter shards that still match the shipped templates, but it must refuse to
+replace any modified/developed shard.
 
 ## Completion
 
