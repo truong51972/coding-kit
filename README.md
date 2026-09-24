@@ -10,8 +10,9 @@ A collection of reusable Codex skills for Python services, application architect
 │   ├── celery-worker/
 │   ├── context-management/
 │   ├── dependency-injection/
-│   ├── drf-control-plane-api/
-│   └── python-monorepo-architecture/
+│   ├── drf-api-architecture/
+│   ├── python-monorepo-architecture/
+│   └── system-prompt-builder/
 ├── install.sh
 ├── LICENSE
 └── README.md
@@ -26,8 +27,9 @@ The installer discovers directories matching `skills/*/SKILL.md` in the selected
 | `celery-worker` | Design and review Celery tasks, routing, lifecycle, scheduling, and tests. |
 | `context-management` | Set up and maintain durable, source-grounded repository context. |
 | `dependency-injection` | Design Python dependency injection across FastAPI, Celery, CLI, resources, and tests. |
-| `drf-control-plane-api` | Build and review Django REST Framework control-plane APIs and workflows. |
+| `drf-api-architecture` | Design and review Django REST Framework API boundaries, object access, workflows, and contracts. |
 | `python-monorepo-architecture` | Maintain Python monorepos built with uv, Docker, and Compose. |
+| `system-prompt-builder` | Build and review production system/developer prompts for LLM applications. |
 
 ## Requirements
 
