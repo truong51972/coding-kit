@@ -30,7 +30,9 @@ details already clear from source.
 
 1. Identify the durable delta.
 2. Load affected shards only.
-3. Verify existing affected facts against source.
+3. Verify existing affected facts against the owning source. When source
+   artifacts conflict, resolve declared ownership/priority first; do not sync
+   whichever file merely changed last.
 4. Remove stale, duplicated, historical, overly detailed, or misplaced content.
 5. Add or rewrite durable current-state knowledge.
 6. Preserve concise source references rather than copied detail.

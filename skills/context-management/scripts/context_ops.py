@@ -287,6 +287,25 @@ def init_context(repo: Path, overwrite: bool) -> int:
     else:
         updated_agents = "# Repository Instructions\n\n" + generic_managed_block().rstrip() + "\n"
 
+    # Preflight starter shards before writing anything. The compatibility
+    # --overwrite flag must never destroy developed repository context.
+    starter_actions: list[tuple[Path, Path, str]] = []
+    for name in DEFAULT_FILES:
+        source = source_dir / name
+        target = target_dir / name
+        if not target.exists():
+            starter_actions.append((source, target, "write"))
+            continue
+        if not overwrite:
+            starter_actions.append((source, target, "skip"))
+            continue
+        if read_text(target) == read_text(source):
+            starter_actions.append((source, target, "skip"))
+            continue
+        print(f"error: refusing to overwrite modified context shard: {target}")
+        print("hint: update or remove the shard explicitly, then run init again.")
+        return 2
+
     # All failure-prone preflight checks run before any write.
     if not agents.exists() or (starts, ends) == (0, 0):
         agents.parent.mkdir(parents=True, exist_ok=True)
@@ -297,10 +316,8 @@ def init_context(repo: Path, overwrite: bool) -> int:
 
     created = 0
     skipped = 0
-    for name in DEFAULT_FILES:
-        source = source_dir / name
-        target = target_dir / name
-        if target.exists() and not overwrite:
+    for source, target, action in starter_actions:
+        if action == "skip":
             print(f"skip existing {target}")
             skipped += 1
             continue
@@ -941,13 +958,10 @@ def run_git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def source_drift_findings(repo: Path) -> list[Finding]:
-    """Report source activity newer than context as a candidate, not proof of drift."""
+    """Report source activity newer than each shard as a candidate, not proof of drift."""
     repo = repo.resolve()
     root = contexts_dir(repo)
     context_files = list(iter_markdown_files(root))
-    agents = agents_file(repo)
-    if agents.exists():
-        context_files.append(agents)
     if not context_files:
         return []
     try:
@@ -973,23 +987,6 @@ def source_drift_findings(repo: Path) -> list[Finding]:
             )
         ]
 
-    context_mtime = max(path.stat().st_mtime for path in context_files)
-    log = run_git(
-        repo,
-        "log",
-        f"--since=@{int(context_mtime)}",
-        "--format=%H%x09%cI",
-        "--",
-        ".",
-        ":(exclude).agents/contexts/**",
-        ":(exclude)AGENTS.md",
-    )
-    commits = (
-        [line for line in log.stdout.splitlines() if line.strip()]
-        if log.returncode == 0
-        else []
-    )
-
     dirty_names: set[str] = set()
     for args in (
         ("diff", "--name-only", "-z"),
@@ -998,31 +995,52 @@ def source_drift_findings(repo: Path) -> list[Finding]:
         result = run_git(repo, *args)
         if result.returncode == 0:
             dirty_names.update(name for name in result.stdout.split("\0") if name)
-    dirty_newer: list[str] = []
-    for name in sorted(dirty_names):
-        if name == "AGENTS.md" or name.startswith(".agents/contexts/"):
-            continue
-        source = repo / name
-        if source.exists() and source.stat().st_mtime > context_mtime:
-            dirty_newer.append(name)
 
-    if not commits and not dirty_newer:
-        return []
-    return [
-        Finding(
-            "SOURCE_CHANGED_SINCE_CONTEXT",
-            "warning",
-            relpath(root, repo),
-            None,
-            "Git shows source activity newer than context; review it as a drift candidate only.",
-            {
-                "context_mtime": context_mtime,
-                "newer_commits": commits,
-                "newer_dirty_tracked_files": dirty_newer,
-                "semantic_verification": "not_performed",
-            },
+    findings: list[Finding] = []
+    for context_path in context_files:
+        context_mtime = context_path.stat().st_mtime
+        log = run_git(
+            repo,
+            "log",
+            f"--since=@{int(context_mtime)}",
+            "--format=%H%x09%cI",
+            "--",
+            ".",
+            ":(exclude).agents/contexts/**",
+            ":(exclude)AGENTS.md",
         )
-    ]
+        commits = (
+            [line for line in log.stdout.splitlines() if line.strip()]
+            if log.returncode == 0
+            else []
+        )
+
+        dirty_newer: list[str] = []
+        for name in sorted(dirty_names):
+            if name == "AGENTS.md" or name.startswith(".agents/contexts/"):
+                continue
+            source = repo / name
+            if source.exists() and source.stat().st_mtime > context_mtime:
+                dirty_newer.append(name)
+
+        if not commits and not dirty_newer:
+            continue
+        findings.append(
+            Finding(
+                "SOURCE_CHANGED_SINCE_CONTEXT",
+                "warning",
+                relpath(context_path, repo),
+                None,
+                "Git shows source activity newer than this context shard; review it as a drift candidate only.",
+                {
+                    "context_mtime": context_mtime,
+                    "newer_commits": commits,
+                    "newer_dirty_tracked_files": dirty_newer,
+                    "semantic_verification": "not_performed",
+                },
+            )
+        )
+    return findings
 
 
 def looks_like_repo_path(value: str, repo: Path) -> bool:
@@ -1228,7 +1246,11 @@ def main(argv: list[str] | None = None) -> int:
 
     init_parser = subparsers.add_parser("init", help="Create minimal .agents/contexts files.")
     init_parser.add_argument("repo", nargs="?", default=".", help="Repository path.")
-    init_parser.add_argument("--overwrite", action="store_true", help="Overwrite existing context files.")
+    init_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Compatibility flag; refuse rather than overwrite modified context shards.",
+    )
 
     for name, help_text in (
         ("lint", "Check deterministic content hygiene."),
