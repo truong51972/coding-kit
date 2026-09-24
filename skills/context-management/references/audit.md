@@ -25,12 +25,16 @@ Audit only the relevant slice:
 ```text
 affected shards
 +
+the marker-managed `AGENTS.md` block
++
 owning source files
 +
 directly relevant tests, config, and canonical docs
 ```
 
 Do not audit the whole repository by default.
+Treat the managed block as the Context Index; do not inspect or modify content
+outside its markers.
 
 ## Checks
 
@@ -38,7 +42,7 @@ Look for:
 
 - Context-source contradictions.
 - Context that copies source-of-truth details instead of referencing source.
-- Loading policy that eagerly bundles several shards for a task category.
+- Managed startup routing that eagerly bundles several shards for a task category.
 - Local Markdown links that do not resolve from their containing context file.
 - Generic sandbox, network, or untracked-file agent rules that are not repo facts.
 - Cross-shard overlap.

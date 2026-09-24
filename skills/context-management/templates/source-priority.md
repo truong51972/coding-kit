@@ -10,7 +10,7 @@ Document the repo-specific source-of-truth hierarchy here.
 
 ## Recommended Startup
 
-1. Read `index.md`.
+1. Read the managed Context Index in `AGENTS.md`.
 2. Check the source roles below for files relevant to the task.
 3. Open the owning source before editing or relying on context.
 4. Load additional context shards only when they help the task.

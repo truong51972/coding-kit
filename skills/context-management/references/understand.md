@@ -1,11 +1,13 @@
 # Understand Lifecycle Operation
 
 Run this operation automatically before non-trivial repository work when
-`.agents/contexts/index.md` exists.
+`AGENTS.md` contains the valid context-management managed marker pair.
 
 ## Goal
 
-Load the smallest useful amount of context needed to work accurately. `understand` is lazy-loading: start with `index.md` only, then open other shards only when the current task gives a clear reason.
+Load the smallest useful amount of context needed to work accurately.
+`understand` is lazy-loading: parse the marker-managed block in `AGENTS.md`,
+then open one linked shard only when the current task gives a clear reason.
 
 ## Trigger
 
@@ -25,7 +27,8 @@ trivial tasks that do not need repository knowledge.
 
 ## Steps
 
-1. Read `.agents/contexts/index.md` first.
+1. Read the marker-managed block in `AGENTS.md` first. Use its Context Index as
+   the sole shard-routing source.
 2. Determine the task scope from the user request and repository paths already
    implicated by the task.
 3. Decide from the index which shard, if any, is needed next.
@@ -46,9 +49,8 @@ trivial tasks that do not need repository knowledge.
 
 - Load `source-priority.md` for source ownership, read order, file roles, source-of-truth conflicts, or drift repair.
 - Load `project-baseline.md` for product, domain, architecture, document narrative, scope, or audience questions.
-- Load `working-conventions.md` for style, coding patterns, writing rules, quality checks, test commands, or review expectations.
 - Load `active-assumptions.md` when decisions depend on constraints, defaults, limits, or unresolved operating assumptions.
-- Load optional shards only when `index.md` says they are relevant to the task.
+- Load optional shards only when the managed Context Index says they are relevant to the task.
 
 ## Source Verification
 
@@ -58,12 +60,14 @@ is authoritative.
 
 ## If Context Is Missing
 
-If `.agents/contexts/index.md` does not exist, say that no context system is initialized. Do not create it unless the user asks for `init` or clearly requests setup.
+If the managed marker block is absent or invalid, say that no context system is
+initialized. Do not create it unless the user asks for `init` or clearly
+requests setup.
 
 ## Avoid
 
 - Do not load every shard by default.
 - Do not make task categories eager-loading shortcuts for several shards.
-- Do not read `source-priority.md` automatically after `index.md`; it is also lazy-loaded.
+- Do not read `source-priority.md` automatically after the managed block; it is also lazy-loaded.
 - Do not treat context files as proof that source files are current.
 - Do not edit context during `understand` unless the user explicitly asks.

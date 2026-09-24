@@ -9,7 +9,7 @@ Use maintenance when:
 - A shard grows beyond roughly 4,000 tokens or 250 non-empty lines.
 - There are many duplicate or near-duplicate facts.
 - Shards are orphaned.
-- Index routing is wrong.
+- Managed Context Index routing is wrong.
 - Context contains substantial changelog or session noise.
 - Repository architecture changed broadly.
 - The user explicitly asks for cleanup or reset.
@@ -18,7 +18,7 @@ Use maintenance when:
 
 - Compact, merge, split, or rewrite shards inside `.agents/contexts/`.
 - Remove stale shards only when replacement routing is clear.
-- Keep `index.md` as the compact entry point.
+- Keep the marker-managed block as the compact entry point and Context Index.
 - Run lint, validate, and static audit after mutations.
 
 ## Not Allowed Without Explicit Request
@@ -26,7 +26,8 @@ Use maintenance when:
 - Delete the entire context system.
 - Reinitialize an existing context system.
 - Delete many shards without replacement routing.
-- Move context ownership outside `.agents/contexts/`.
+- Move shard ownership outside `.agents/contexts/` or managed routing outside
+  the `AGENTS.md` marker block.
 
 ## Reset
 

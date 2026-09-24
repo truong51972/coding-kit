@@ -34,7 +34,10 @@ details already clear from source.
 4. Remove stale, duplicated, historical, overly detailed, or misplaced content.
 5. Add or rewrite durable current-state knowledge.
 6. Preserve concise source references rather than copied detail.
-7. Update `index.md` only when shard routing changes.
+7. Update the managed Context Index only when shard routing changes. Promote a
+   fact into Project Working Conventions only when it is durable, repo-wide,
+   and worth eager loading; never auto-copy content merely because headings
+   match.
 8. Run `context_ops.py lint`.
 9. Run `context_ops.py validate`.
 10. Run `context_ops.py audit`.

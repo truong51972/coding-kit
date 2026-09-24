@@ -1,6 +1,6 @@
 ---
 name: context-management
-description: Manage durable repo context when .agents/contexts/index.md exists or users request setup, review, sync, or cleanup.
+description: Manage durable repo context when AGENTS.md has the context-management managed marker or users request setup, review, sync, or cleanup.
 ---
 
 # Context Management
@@ -11,14 +11,17 @@ session.
 
 ## Activation and ownership
 
-Apply this skill implicitly for non-trivial repository work when
-`.agents/contexts/index.md` exists. Do not initialize context merely because the
-skill is available. Use [init.md](references/init.md) only when the user requests
-setup or repository instructions enable it.
+Apply this skill implicitly for non-trivial repository work when `AGENTS.md`
+contains one valid `context-management` managed marker pair. Do not initialize
+context merely because the skill is available. Use [init.md](references/init.md)
+only when the user requests setup or repository instructions enable it.
 
-Own only `.agents/contexts/`. Let source code, schemas, configuration, tests,
-and canonical documentation own their exact details. Treat source as
-authoritative whenever it conflicts with context.
+Own only `.agents/contexts/**` and the marker-managed block in `AGENTS.md`.
+Never analyze or modify the rest of `AGENTS.md`; initialization may locate its
+H1 only to insert the managed block without changing surrounding bytes. Let
+source code, schemas, configuration, tests, and canonical documentation own
+their exact details. Treat source as authoritative whenever it conflicts with
+context.
 
 ## Lifecycle
 
@@ -49,12 +52,13 @@ owning source instead of copying the detail.
 
 ## Loading rules
 
-- Read `index.md` first.
+- Read the managed block in `AGENTS.md` first and use its Context Index as the
+  only routing source.
 - Load one shard at a time only when the current task needs it.
 - Do not map a task category to a default bundle of several shards.
 - Load `source-priority.md` only for ownership, canonical read order, source
   conflicts, or drift repair.
-- Keep `index.md` limited to routing and loading policy.
+- Keep routing and eager repository-wide conventions in the managed block.
 - Add or split shards only when more targeted loading becomes useful.
 
 ## Compatibility
@@ -89,7 +93,8 @@ not_performed`.
 
 ## Completion
 
-- Keep every shard reachable from `index.md` and lazy-loaded independently.
+- Keep every shard linked from the managed Context Index and lazy-loaded
+  independently.
 - Resolve conflicts in favor of source and sync only durable deltas.
 - Run `lint` and `validate` after context edits; review `audit` findings.
 - Report accepted warnings without claiming semantic verification.

@@ -2,42 +2,50 @@
 
 Use this operation when the user asks to create a fresh context system for a
 repo, or repository instructions explicitly enable context management and
-`.agents/contexts/index.md` does not exist.
+the managed context block is absent or the user asks to establish it.
 
 ## Goal
 
-Create `.agents/contexts/` with minimal generic starter files. Do not infer a full project baseline unless the user provides it in the request or asks you to inspect source files.
+Create a minimal marker-managed `AGENTS.md` startup block and
+`.agents/contexts/` starter shards. Do not infer a full project baseline unless
+the user provides it in the request or asks you to inspect source files.
 
 ## Steps
 
 1. Locate the repo root from the current working directory unless the user provides a path.
-2. Confirm `.agents/contexts/index.md` does not already exist. Do not
-   reinitialize an existing context system without explicit reset instructions.
-3. Run the helper script:
+2. If `AGENTS.md` exists without markers, insert the generic managed block
+   immediately after its H1 while preserving every other byte. If it is absent,
+   create a minimal file with that block. A valid existing managed block is
+   idempotent and is never overwritten, including with `--overwrite`.
+3. Fail before writing when a present marker is missing its counterpart,
+   markers are mismatched or duplicated, or when legacy
+   `.agents/contexts/index.md` or `working-conventions.md` remains to be
+   semantically migrated.
+4. Run the helper script:
 
    ```bash
    python3 /path/to/context-management/scripts/context_ops.py init <repo-path>
    ```
 
-4. If the user provided project details, place them in the correct shard as current-state baseline.
-5. If `.agents/context.md` exists, mention that legacy context was found, but do not migrate it unless explicitly requested.
-6. Keep generated files minimal and generic. Do not create `AGENTS.md`.
+5. If the user provided project details, place them in the correct shard as current-state baseline.
+6. If `.agents/context.md` exists, mention that legacy context was found, but do not migrate it unless explicitly requested.
+7. Keep generated files minimal and generic.
 
 ## Starter File Intent
 
-- `index.md`: map available shards, explain loading policy, and keep the entrypoint compact.
 - `source-priority.md`: list recommended startup, source roles, source priority, and conflict rules once known.
 - `project-baseline.md`: store durable purpose, audience, domain, system/content shape, scope, and success criteria once known.
-- `working-conventions.md`: store stable domain conventions, style rules, quality guardrails, and validation commands.
 - `active-assumptions.md`: store assumptions, constraints, defaults, and operating limits that future sessions must preserve.
+- `AGENTS.md` managed block: generic startup, shard routing, and eager
+  repo-wide conventions.
 
 ## Placement Guide
 
 - Put source ownership, document roles, config/schema authority, and read conditions in `source-priority.md`.
 - Put project identity, architecture/content shape, scope boundaries, and durable narrative in `project-baseline.md`.
-- Put writing style, coding style, review rules, testing commands, diagram rules, and quality checks in `working-conventions.md`.
 - Put live constraints, accepted defaults, and future-affecting assumptions in `active-assumptions.md`.
-- Put only the shard map and startup route in `index.md`.
+- Put only durable, repo-wide, eager-worthy conventions and shard routing in
+  the managed `AGENTS.md` block.
 
 ## Adaptation Examples
 
@@ -47,7 +55,9 @@ Create `.agents/contexts/` with minimal generic starter files. Do not infer a fu
 
 ## Avoid
 
-- Do not auto-migrate legacy `.agents/context.md`.
+- Do not auto-migrate legacy `.agents/context.md` or silently replace a legacy
+  context layout.
 - Do not invent project-specific shards before the repo needs them.
 - Do not fill context files with placeholder prose that future sessions must clean up.
-- Do not overwrite existing context files unless the user explicitly asks.
+- `--overwrite` applies only to starter shards; it never overwrites a developed
+  managed block.

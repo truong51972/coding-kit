@@ -22,14 +22,20 @@ from urllib.parse import unquote, urlparse
 
 
 SCHEMA_VERSION = 1
-DEFAULT_MARKER = "context-management:default-layout:v1"
+MANAGED_BLOCK_START = "<!-- context-management:start -->"
+MANAGED_BLOCK_END = "<!-- context-management:end -->"
 DEFAULT_FILES = (
-    "index.md",
     "source-priority.md",
     "project-baseline.md",
-    "working-conventions.md",
     "active-assumptions.md",
 )
+REQUIRED_MANAGED_HEADINGS = (
+    ("##", "Context Management"),
+    ("###", "Startup"),
+    ("###", "Context Index"),
+    ("###", "Project Working Conventions"),
+)
+LEGACY_CONTEXT_FILES = ("index.md", "working-conventions.md")
 
 NOISE_PATTERNS = (
     r"\bTODO\b",
@@ -55,9 +61,9 @@ SIGNATURE_RE = re.compile(r"\b(?:def|class)\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:\(|:)"
 SQL_DDL_RE = re.compile(r"\bCREATE\s+(?:TABLE|INDEX|VIEW)\b|\bALTER\s+TABLE\b", re.IGNORECASE)
 
 SIZE_LIMITS = {
-    "index_warning_tokens": 1000,
-    "index_warning_lines": 100,
-    "index_strong_tokens": 2000,
+    "managed_warning_tokens": 1000,
+    "managed_warning_lines": 100,
+    "managed_strong_tokens": 2000,
     "shard_warning_tokens": 4000,
     "shard_warning_lines": 250,
     "shard_strong_tokens": 8000,
@@ -95,6 +101,10 @@ def skill_root() -> Path:
 
 def contexts_dir(repo: Path) -> Path:
     return repo / ".agents" / "contexts"
+
+
+def agents_file(repo: Path) -> Path:
+    return repo / "AGENTS.md"
 
 
 def relpath(path: Path, repo: Path) -> str:
@@ -138,6 +148,96 @@ def markdown_references(text: str) -> list[tuple[str, int]]:
     return refs
 
 
+def markdown_link_references(text: str) -> list[tuple[str, int]]:
+    refs: list[tuple[str, int]] = []
+    for match in MARKDOWN_LINK_RE.finditer(text):
+        reference = strip_anchor(match.group(1))
+        if reference.endswith(".md") and not is_external_reference(reference):
+            refs.append((reference, line_for_offset(text, match.start())))
+    return refs
+
+
+def managed_block(repo: Path) -> tuple[str | None, list[Finding]]:
+    path = agents_file(repo)
+    if not path.exists():
+        return None, [
+            Finding(
+                "MANAGED_BLOCK_ERROR",
+                "error",
+                relpath(path, repo),
+                None,
+                "AGENTS.md is missing.",
+            )
+        ]
+
+    text = read_text(path)
+    starts = text.count(MANAGED_BLOCK_START)
+    ends = text.count(MANAGED_BLOCK_END)
+    if starts != 1 or ends != 1:
+        return None, [
+            Finding(
+                "MANAGED_BLOCK_ERROR",
+                "error",
+                relpath(path, repo),
+                None,
+                "AGENTS.md must contain exactly one context-management marker pair.",
+                {"starts": starts, "ends": ends},
+            )
+        ]
+
+    start = text.index(MANAGED_BLOCK_START) + len(MANAGED_BLOCK_START)
+    end = text.index(MANAGED_BLOCK_END)
+    if end < start:
+        return None, [
+            Finding(
+                "MANAGED_BLOCK_ERROR",
+                "error",
+                relpath(path, repo),
+                None,
+                "The context-management end marker precedes its start marker.",
+            )
+        ]
+
+    block = text[start:end].strip()
+    missing = [
+        f"{level} {heading}"
+        for level, heading in REQUIRED_MANAGED_HEADINGS
+        if not re.search(rf"^{re.escape(level)}\s+{re.escape(heading)}\s*$", block, re.MULTILINE)
+    ]
+    if missing:
+        return None, [
+            Finding(
+                "MANAGED_BLOCK_ERROR",
+                "error",
+                relpath(path, repo),
+                None,
+                "Managed context block is missing required headings.",
+                {"missing_headings": missing},
+            )
+        ]
+    return block, []
+
+
+def managed_content_entries(repo: Path) -> list[tuple[Path, str]]:
+    block, findings = managed_block(repo)
+    if findings or block is None:
+        return []
+    entries = [(agents_file(repo), block)]
+    entries.extend((path, read_text(path)) for path in iter_markdown_files(contexts_dir(repo)))
+    return entries
+
+
+def generic_managed_block() -> str:
+    return read_text(template_dir() / "managed-block.md")
+
+
+def insert_managed_block(text: str, block: str) -> str:
+    match = re.search(r"^#\s+.+(?:\n|$)", text, re.MULTILINE)
+    if not match:
+        raise ValueError("AGENTS.md must contain an H1 before context initialization.")
+    return text[: match.end()] + "\n" + block.rstrip() + "\n" + text[match.end() :]
+
+
 def line_for_offset(text: str, offset: int) -> int:
     return text.count("\n", 0, offset) + 1
 
@@ -159,6 +259,40 @@ def init_context(repo: Path, overwrite: bool) -> int:
     repo = repo.resolve()
     target_dir = contexts_dir(repo)
     source_dir = template_dir()
+
+    legacy_paths = [target_dir / name for name in LEGACY_CONTEXT_FILES if (target_dir / name).exists()]
+    if legacy_paths:
+        print("error: legacy context layout must be semantically migrated before init:")
+        for path in legacy_paths:
+            print(f"  {path}")
+        return 2
+
+    agents = agents_file(repo)
+    if agents.exists():
+        text = read_text(agents)
+        starts = text.count(MANAGED_BLOCK_START)
+        ends = text.count(MANAGED_BLOCK_END)
+        if (starts, ends) != (0, 0):
+            _block, findings = managed_block(repo)
+            if findings:
+                for finding in findings:
+                    print(f"error: {finding.message}")
+                return 2
+        else:
+            try:
+                updated_agents = insert_managed_block(text, generic_managed_block())
+            except ValueError as error:
+                print(f"error: {error}")
+                return 2
+    else:
+        updated_agents = "# Repository Instructions\n\n" + generic_managed_block().rstrip() + "\n"
+
+    # All failure-prone preflight checks run before any write.
+    if not agents.exists() or (starts, ends) == (0, 0):
+        agents.parent.mkdir(parents=True, exist_ok=True)
+        agents.write_text(updated_agents, encoding="utf-8")
+        print(f"write {agents}")
+
     target_dir.mkdir(parents=True, exist_ok=True)
 
     created = 0
@@ -187,8 +321,13 @@ def structural_findings(repo: Path) -> list[Finding]:
     root = contexts_dir(repo)
     findings: list[Finding] = []
 
+    block, block_findings = managed_block(repo)
+    findings.extend(block_findings)
+    if block is None:
+        return findings
+
     if not root.exists():
-        return [
+        findings.append(
             Finding(
                 "STRUCTURE_ERROR",
                 "error",
@@ -196,77 +335,92 @@ def structural_findings(repo: Path) -> list[Finding]:
                 None,
                 "Context directory is missing.",
             )
-        ]
+        )
+        return findings
 
-    index = root / "index.md"
-    if not index.exists():
+    for name in LEGACY_CONTEXT_FILES:
+        legacy = root / name
+        if legacy.exists():
+            findings.append(
+                Finding(
+                    "LEGACY_LAYOUT_ERROR",
+                    "error",
+                    relpath(legacy, repo),
+                    None,
+                    "Legacy context layout file must be migrated or removed.",
+                )
+            )
+
+    index_text = section_text(block, "Context Index")
+    if not index_text:
         findings.append(
             Finding(
-                "STRUCTURE_ERROR",
+                "MANAGED_BLOCK_ERROR",
                 "error",
-                relpath(index, repo),
+                relpath(agents_file(repo), repo),
                 None,
-                "Required context index is missing.",
+                "Managed context block requires a non-empty Context Index.",
             )
         )
         return findings
 
-    index_text = read_text(index)
-    seen_refs: dict[str, list[int]] = {}
-    
-    shard_section = section_text(index_text, "Shards")
-    shard_section_start = section_start_line(index_text, "Shards")
-    
-    for reference, line in markdown_references(shard_section):
-        adjusted_line = line + shard_section_start - 1
-        seen_refs.setdefault(reference, []).append(adjusted_line)
-        
+    seen_refs: dict[Path, list[tuple[str, int]]] = {}
+    index_start = section_start_line(block, "Context Index")
+    for reference, line in markdown_link_references(index_text):
+        adjusted_line = line + index_start - 1
         target = resolve_context_reference(repo, root, reference)
+        seen_refs.setdefault(target.resolve(), []).append((reference, adjusted_line))
         if escapes_repo(root, target):
             findings.append(
                 Finding(
                     "CONTEXT_REFERENCE_ESCAPE",
                     "error",
-                    relpath(index, repo),
+                    relpath(agents_file(repo), repo),
                     adjusted_line,
                     f"Shard reference escapes context directory: {reference}.",
                     {"reference": reference, "resolved_to": relpath(target, repo)},
                 )
             )
             continue
-            
+
         if not target.exists():
             findings.append(
                 Finding(
                     "BROKEN_REFERENCE",
                     "error",
-                    relpath(index, repo),
+                    relpath(agents_file(repo), repo),
                     adjusted_line,
-                    f"Index references missing context file: {reference}.",
+                    f"Context Index references missing context file: {reference}.",
                     {"reference": reference, "resolved_to": relpath(target, repo)},
                 )
             )
 
-    for reference, lines in sorted(seen_refs.items()):
-        if len(lines) > 1:
+    for target, entries in sorted(seen_refs.items(), key=lambda item: str(item[0])):
+        if len(entries) > 1:
+            reference = entries[1][0]
+            lines = [line for _reference, line in entries]
             findings.append(
                 Finding(
                     "DUPLICATE_CONTENT_WARNING",
                     "warning",
-                    relpath(index, repo),
+                    relpath(agents_file(repo), repo),
                     lines[1],
-                    f"Index references {reference} more than once.",
-                    {"reference": reference, "lines": lines},
+                    f"Context Index references {reference} more than once.",
+                    {
+                        "reference": reference,
+                        "lines": lines,
+                        "resolved_to": relpath(target, repo),
+                    },
                 )
             )
 
     referenced_paths = {
-        resolve_context_reference(repo, root, reference).resolve()
-        for reference in seen_refs
-        if resolve_context_reference(repo, root, reference).exists()
+        target
+        for target in seen_refs
+        if target.exists()
     }
     for path in iter_markdown_files(root):
-        if path.name == "index.md":
+        if path.name in LEGACY_CONTEXT_FILES:
             continue
         if path.resolve() not in referenced_paths:
             findings.append(
@@ -275,7 +429,7 @@ def structural_findings(repo: Path) -> list[Finding]:
                     "warning",
                     relpath(path, repo),
                     None,
-                    "Context shard is not referenced by index.md.",
+                    "Context shard is not referenced by the managed Context Index.",
                 )
             )
 
@@ -286,20 +440,23 @@ def lint_findings(repo: Path) -> list[Finding]:
     repo = repo.resolve()
     root = contexts_dir(repo)
     findings: list[Finding] = []
-    if not root.exists():
-        return [
-            Finding(
-                "STRUCTURE_ERROR",
-                "error",
-                relpath(root, repo),
-                None,
-                "Context directory is missing.",
+    block, block_findings = managed_block(repo)
+    findings.extend(block_findings)
+    if block is None or not root.exists():
+        if not root.exists():
+            findings.append(
+                Finding(
+                    "STRUCTURE_ERROR",
+                    "error",
+                    relpath(root, repo),
+                    None,
+                    "Context directory is missing.",
+                )
             )
-        ]
+        return findings
 
     compiled = [re.compile(pattern, re.IGNORECASE) for pattern in NOISE_PATTERNS]
-    for path in iter_markdown_files(root):
-        text = read_text(path)
+    for path, text in managed_content_entries(repo):
         for lineno, line in enumerate(text.splitlines(), 1):
             for pattern in compiled:
                 match = pattern.search(line)
@@ -360,12 +517,11 @@ def identifier_density_findings(repo: Path) -> list[Finding]:
     findings: list[Finding] = []
     if not root.exists():
         return findings
-    for path in iter_markdown_files(root):
-        if path.name in {"index.md", "source-priority.md"}:
+    for path, text in managed_content_entries(repo):
+        if path == agents_file(repo) or path.name == "source-priority.md":
             # These files legitimately concentrate exact paths and identifiers
             # for routing. Other checks still validate their links and paths.
             continue
-        text = read_text(path)
         for heading, start_line, body in sections_by_heading(text):
             code_spans = [
                 value.strip()
@@ -412,10 +568,10 @@ def code_like_identifiers(text: str) -> set[str]:
 
 def lazy_loading_findings(repo: Path) -> list[Finding]:
     repo = repo.resolve()
-    index = contexts_dir(repo) / "index.md"
-    if not index.exists():
+    block, findings = managed_block(repo)
+    if block is None:
         return []
-    text = read_text(index)
+    text = section_text(block, "Startup")
     checks = (
         (r"always\s+read\s+`?source-priority\.md`?", "Index eagerly requires source-priority.md."),
         (r"read\s+`?source-priority\.md`?\s+(?:before|for)\s+every\s+task", "Index requires source-priority.md for every task."),
@@ -430,9 +586,9 @@ def lazy_loading_findings(repo: Path) -> list[Finding]:
                 Finding(
                     "LAZY_LOADING_WARNING",
                     "warning",
-                    relpath(index, repo),
-                    line_for_offset(text, match.start()),
-                    message,
+                    relpath(agents_file(repo), repo),
+                    section_start_line(block, "Startup") + line_for_offset(text, match.start()) - 1,
+                    message.replace("Index", "Managed startup"),
                     {"matched": match.group(0)},
                 )
             )
@@ -442,14 +598,13 @@ def lazy_loading_findings(repo: Path) -> list[Finding]:
 def eager_shard_bundle_findings(repo: Path) -> list[Finding]:
     """Flag task routes that eagerly load multiple context shards."""
     repo = repo.resolve()
-    index = contexts_dir(repo) / "index.md"
-    if not index.exists():
+    block, findings = managed_block(repo)
+    if block is None:
         return []
-    text = read_text(index)
-    policy = section_text(text, "Loading Policy")
+    policy = section_text(block, "Startup")
     if not policy:
         return []
-    start = section_start_line(text, "Loading Policy")
+    start = section_start_line(block, "Startup")
     findings: list[Finding] = []
     for offset, line in enumerate(policy.splitlines()):
         if not re.search(r"\b(?:load|read)\b", line, re.IGNORECASE):
@@ -462,10 +617,10 @@ def eager_shard_bundle_findings(repo: Path) -> list[Finding]:
         if len(refs) < 2:
             continue
         findings.append(
-            Finding(
-                "EAGER_SHARD_BUNDLE",
-                "warning",
-                relpath(index, repo),
+                Finding(
+                    "EAGER_SHARD_BUNDLE",
+                    "warning",
+                    relpath(agents_file(repo), repo),
                 start + offset,
                 "Loading policy eagerly bundles multiple shards for one task category.",
                 {"references": sorted(refs), "line": line.strip()},
@@ -478,21 +633,23 @@ def size_findings(repo: Path) -> list[Finding]:
     repo = repo.resolve()
     root = contexts_dir(repo)
     findings: list[Finding] = []
-    if not root.exists():
+    block, _block_findings = managed_block(repo)
+    if block is None or not root.exists():
         return findings
 
-    for path in iter_markdown_files(root):
-        text = read_text(path)
+    entries = [(agents_file(repo), block)]
+    entries.extend((path, read_text(path)) for path in iter_markdown_files(root))
+    for path, text in entries:
         tokens = estimated_tokens(text)
         non_empty_lines = len([line for line in text.splitlines() if line.strip()])
-        if path.name == "index.md":
-            if tokens > SIZE_LIMITS["index_strong_tokens"]:
-                message = "Index exceeds the strong recommended token budget."
+        if path == agents_file(repo):
+            if tokens > SIZE_LIMITS["managed_strong_tokens"]:
+                message = "Managed context block exceeds the strong recommended token budget."
             elif (
-                tokens > SIZE_LIMITS["index_warning_tokens"]
-                or non_empty_lines > SIZE_LIMITS["index_warning_lines"]
+                tokens > SIZE_LIMITS["managed_warning_tokens"]
+                or non_empty_lines > SIZE_LIMITS["managed_warning_lines"]
             ):
-                message = "Index exceeds the recommended compactness budget."
+                message = "Managed context block exceeds the recommended compactness budget."
             else:
                 continue
             findings.append(
@@ -541,8 +698,7 @@ def duplicate_findings(repo: Path) -> list[Finding]:
     findings: list[Finding] = []
     seen: dict[str, tuple[Path, int, str]] = {}
 
-    for path in iter_markdown_files(root):
-        text = read_text(path)
+    for path, text in managed_content_entries(repo):
         for start_line, paragraph in paragraphs(text):
             normalized = normalize_block(paragraph)
             if len(normalized) < 60:
@@ -567,8 +723,8 @@ def duplicate_findings(repo: Path) -> list[Finding]:
                 seen[normalized] = (path, start_line, paragraph)
 
     sections: dict[str, list[tuple[Path, int, str]]] = {}
-    for path in iter_markdown_files(root):
-        for heading, line, body in sections_by_heading(read_text(path)):
+    for path, text in managed_content_entries(repo):
+        for heading, line, body in sections_by_heading(text):
             normalized_heading = normalize_block(heading)
             if len(body.strip()) >= 80:
                 sections.setdefault(normalized_heading, []).append((path, line, body))
@@ -667,8 +823,7 @@ def path_reference_findings(repo: Path) -> list[Finding]:
     if not root.exists():
         return findings
 
-    for path in iter_markdown_files(root):
-        text = read_text(path)
+    for path, text in managed_content_entries(repo):
         for match in CODE_SPAN_RE.finditer(text):
             value = match.group(1).strip()
             if not looks_like_repo_path(value, repo):
@@ -708,8 +863,7 @@ def local_link_findings(repo: Path) -> list[Finding]:
     if not root.exists():
         return findings
 
-    for path in iter_markdown_files(root):
-        text = read_text(path)
+    for path, text in managed_content_entries(repo):
         for match in MARKDOWN_LINK_RE.finditer(text):
             raw = match.group(1).strip().strip("<>")
             # Ignore optional Markdown titles after an unquoted URL/path.
@@ -760,8 +914,7 @@ def generic_agent_rule_findings(repo: Path) -> list[Finding]:
         ),
         re.compile(r"\buntracked\s+(?:file|files|change|changes)\b", re.IGNORECASE),
     )
-    for path in iter_markdown_files(root):
-        text = read_text(path)
+    for path, text in managed_content_entries(repo):
         for lineno, line in enumerate(text.splitlines(), 1):
             if any(pattern.search(line) for pattern in patterns):
                 findings.append(
@@ -792,6 +945,9 @@ def source_drift_findings(repo: Path) -> list[Finding]:
     repo = repo.resolve()
     root = contexts_dir(repo)
     context_files = list(iter_markdown_files(root))
+    agents = agents_file(repo)
+    if agents.exists():
+        context_files.append(agents)
     if not context_files:
         return []
     try:
@@ -826,6 +982,7 @@ def source_drift_findings(repo: Path) -> list[Finding]:
         "--",
         ".",
         ":(exclude).agents/contexts/**",
+        ":(exclude)AGENTS.md",
     )
     commits = (
         [line for line in log.stdout.splitlines() if line.strip()]
@@ -843,7 +1000,7 @@ def source_drift_findings(repo: Path) -> list[Finding]:
             dirty_names.update(name for name in result.stdout.split("\0") if name)
     dirty_newer: list[str] = []
     for name in sorted(dirty_names):
-        if name.startswith(".agents/contexts/"):
+        if name == "AGENTS.md" or name.startswith(".agents/contexts/"):
             continue
         source = repo / name
         if source.exists() and source.stat().st_mtime > context_mtime:
@@ -875,16 +1032,26 @@ def looks_like_repo_path(value: str, repo: Path) -> bool:
         return False
     if value.startswith("/"):
         return False
-    command_prefixes = {"python", "python3", "uv", "npm", "pnpm", "yarn", "docker", "alembic", "git"}
+    command_prefixes = {
+        "python",
+        "python3",
+        "uv",
+        "npm",
+        "pnpm",
+        "yarn",
+        "docker",
+        "alembic",
+        "git",
+    }
     first = value.split("/", 1)[0]
     if first in command_prefixes:
         return False
     if value.startswith(("./", "../")):
         return True
-    
+
     if (repo / first).exists():
         return True
-        
+
     return False
 
 
@@ -923,7 +1090,7 @@ def path_exists_or_glob_base(path: Path) -> bool:
 
 def audit_findings(repo: Path) -> list[Finding]:
     findings: list[Finding] = []
-    
+
     struct_findings = structural_findings(repo)
     findings.extend(struct_findings)
     if any(f.severity == "error" for f in struct_findings):
@@ -950,9 +1117,8 @@ def status_findings(repo: Path) -> list[Finding]:
         return findings
 
     total_tokens = 0
-    files = list(iter_markdown_files(root))
-    for path in files:
-        text = read_text(path)
+    entries = managed_content_entries(repo)
+    for path, text in entries:
         tokens = estimated_tokens(text)
         total_tokens += tokens
         findings.append(
@@ -975,7 +1141,7 @@ def status_findings(repo: Path) -> list[Finding]:
             relpath(root, repo),
             None,
             "Context status summary.",
-            {"files": len(files), "estimated_tokens": total_tokens},
+            {"files": len(entries), "estimated_tokens": total_tokens},
         )
     )
     return findings
