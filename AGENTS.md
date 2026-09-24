@@ -10,19 +10,23 @@ The closest applicable instruction takes precedence. Repository code,
 configuration, tests, CI, framework conventions, and documentation remain the
 source of truth.
 
+When authoritative artifacts disagree, resolve ownership from repository
+conventions and the boundary that owns the behavior. Do not use recency alone
+as evidence of authority. Keep unresolved conflicts visible rather than
+guessing.
+
 ## Engineering principles
 
-### Build only for real needs
+### Establish the real requirement
 
 Do not implement a feature merely because it is technically possible.
 
-A production change must have:
+Before a non-trivial behavioral change, establish enough evidence to understand:
 
-- a concrete user, operational, or business use case;
-- an observable problem or required outcome;
-- explicit scope and acceptance criteria;
-- evidence of the current behavior and why it is absent, incorrect, or
-  insufficient.
+- the concrete user, operational, or business need;
+- the current behavior and why it is absent, incorrect, or insufficient;
+- the required outcome and relevant acceptance criteria;
+- the scope and boundaries that must remain unchanged.
 
 Treat the requested solution as a hypothesis. Investigate the problem and the
 existing execution path before committing to an implementation.
@@ -33,18 +37,19 @@ the assumption, choose the simplest reversible option, and proceed.
 
 ### Prefer the simplest sufficient solution
 
-Before writing new code, use this order:
+Consider simpler options before adding new code or infrastructure:
 
 1. Remove the need or use existing behavior or configuration.
 2. Reuse an established repository implementation or pattern.
-3. Use the standard library.
-4. Use native framework or platform capabilities.
-5. Use an already-installed dependency.
-6. Add a well-established dependency only when justified.
-7. Write the minimum custom code required.
+3. Prefer native framework or platform capabilities.
+4. Prefer the standard library or already-installed dependencies when they
+   reduce net complexity.
+5. Add a mature dependency only when justified.
+6. Write custom infrastructure only when simpler options do not satisfy the
+   requirement.
 
-Stop at the first option that satisfies the actual requirement without creating
-greater net complexity.
+Choose by ownership, correctness, maintainability, and net complexity rather
+than mechanically following the list.
 
 Prefer deletion over addition, explicit code over premature abstraction, boring
 code over clever code, the smallest coherent diff, and root-cause fixes over
@@ -75,27 +80,23 @@ Enforce invariants at the lowest authoritative boundary that owns them:
 Do not reimplement behavior already owned by a framework, platform, database,
 generator, or repository tool.
 
+Preserve established public contracts and persisted-data compatibility unless
+the requested change explicitly requires breaking them. Do not add speculative
+compatibility layers for undocumented or hypothetical consumers.
+
 ### Protect generated artifacts
 
-Do not manually create or edit artifacts generated or managed by a framework,
-code generator, schema compiler, package manager, build system, or repository
-script.
+Identify generated or tool-managed artifacts through framework conventions,
+generated headers, documentation, configuration, and existing commands.
 
-Identify generated artifacts through framework conventions, generated headers,
-documentation, configuration, and existing commands. Modify the authoritative
-source, run the canonical generator, CLI, migration command, formatter,
-compiler, or script, then inspect and validate its output.
+Modify the authoritative source and use the canonical generator, CLI, migration
+command, formatter, compiler, package manager, or repository script when the
+tool owns the artifact.
 
-Examples include framework migrations, generated clients, lock files, compiled
-schemas, generated manifests, tool-owned snapshots, and derived build outputs.
-
-For Django schema changes, modify the authoritative models and use the
-repository's migration command. Never manually create or edit files under
-`migrations/`.
-
-If an authoritative tool cannot safely produce the required artifact, report a
-blocker. Do not hand-edit generated output unless the user explicitly authorizes
-an exception and repository conventions permit it.
+Hand-author or edit a generated artifact only when the owning framework or tool
+explicitly supports it and the required semantics cannot be expressed through
+the normal generator path. Inspect and validate generated output rather than
+assuming successful generation proves correctness.
 
 ### Keep changes coherent and scoped
 
@@ -110,15 +111,25 @@ Leave affected code no harder to understand, test, operate, or change than
 before, without expanding the task into general cleanup or theoretical
 perfection.
 
-## Workspace safety
+## Workspace and mutation safety
+
+Review, analysis, investigation, and planning requests are read-only unless the
+user also requests implementation. Do not modify repository state merely because
+a possible fix was identified.
 
 Before editing, inspect the working tree and identify pre-existing changes.
 Do not discard, overwrite, revert, reformat, or include unrelated user changes.
 Do not run destructive Git, filesystem, database, or migration commands without
 explicit authorization.
 
-Only one write-capable agent may modify overlapping files at a time. Use
-separate worktrees or isolated branches when concurrent writers are necessary.
+Do not commit, log, copy into fixtures, or expose credentials, tokens, private
+keys, or other secrets. Preserve the repository's existing secret-management
+boundary.
+
+Only one write-capable agent may modify overlapping files at a time. Parallel
+writers are acceptable only when file ownership and relevant contracts are
+independent and each writer uses an isolated worktree, branch, or equivalent
+workspace.
 
 ## Execution model
 
@@ -134,9 +145,9 @@ Use a trivial workflow for typo-only, comment-only, mechanical formatting,
 narrow documentation, and obvious non-behavioral configuration changes.
 
 Use a standard workflow for localized, well-understood changes with clear
-ownership and acceptance criteria. The primary agent handles these directly and
-may use at most one bounded subagent when isolated exploration, test work, or a
-fresh-context review materially improves confidence.
+ownership and acceptance criteria. Delegate bounded work only when
+specialization, independent exploration, testing, or fresh-context review
+materially improves confidence.
 
 Use a planning-first workflow for substantial, cross-boundary, or high-risk
 changes. Investigate the current execution path and produce a concrete
@@ -149,32 +160,31 @@ authoritative approved plan artifact. Entering Plan mode alone does not
 authorize implementation.
 
 Approval authorizes implementation of the scoped plan; it does not require a
-multi-agent pipeline. The primary agent may execute directly. Delegate only
-when bounded specialization, independent work, or fresh-context review
-materially improves confidence. If repository evidence materially invalidates
-the plan, stop and resolve the mismatch rather than silently redesigning it.
+multi-agent pipeline. If repository evidence materially invalidates the plan,
+stop and resolve the mismatch rather than silently redesigning it.
 
 ### Subagent delegation
 
 Delegate only work that is bounded, suited to the agent's specialization,
 sufficiently independent, and worth its coordination and token cost.
 
-Prefer subagents for context-heavy exploration, isolated implementation from an
-approved plan, independent test work, and fresh-context final review.
+Prefer subagents for context-heavy exploration, isolated implementation,
+independent test work, and fresh-context review.
 
-Use the fewest agents necessary. Do not hard-code a fixed subagent role pipeline;
-choose roles from the actual task boundaries. Parallelize only independent
-read-heavy work.
-Run agents sequentially when they share files, contracts, decisions, or mutable
-state. Unless explicitly justified, do not run more than two subagents
-concurrently.
+Use the fewest agents necessary. Do not hard-code a fixed subagent role
+pipeline; choose roles from the actual task boundaries.
+
+Parallelize independent read-heavy work when useful. Parallelize write work only
+when ownership and contracts are independent and writers are isolated. Keep
+concurrency low by default and increase it only when the coordination cost
+remains lower than the expected benefit.
 
 Do not ask agents to duplicate work, allow unauthorized nested delegation, or
 make the primary agent repeat exploration already completed by a subagent.
 Require concise evidence-based reports rather than raw logs or copied source.
 
-If a custom agent is unavailable, the primary agent may perform the same work
-under the same constraints and must disclose the fallback.
+If a delegated role is unavailable, the primary agent may perform the work
+under the same constraints.
 
 ## Validation and completion
 
@@ -186,10 +196,18 @@ repository-specific checks.
 Prefer tests at the public or integration boundary closest to the real use case.
 Use unit tests for isolated invariants and defensive branches.
 
-Do not claim a command passed unless it ran successfully. Report unrun or
-failing checks and the remaining uncertainty.
+Do not weaken, delete, skip, or rewrite a failing test merely to make validation
+pass. Change a test only when the required behavior or contract legitimately
+changed, and keep the new expectation traceable to that change.
 
-A task is complete only when the approved use case and acceptance criteria are
-satisfied, the diff remains within scope, generated artifacts came from
-authoritative tools, required validation passed, no blocking review findings
-remain, and assumptions, limitations, and unrun checks are disclosed.
+Do not claim a command passed unless it ran successfully. Do not claim full
+verification unless all required validation ran successfully.
+
+When a required check cannot run, report the implementation state separately
+from the verification state and explain the remaining uncertainty.
+
+A task is complete when the requested behavior and acceptance criteria are
+satisfied, the diff remains within scope, generated artifacts follow their
+authoritative workflow, all feasible required validation passes, no known
+blocking review findings remain, and unavailable checks, assumptions,
+limitations, and residual risks are disclosed.
