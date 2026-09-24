@@ -162,7 +162,9 @@ sufficiently independent, and worth its coordination and token cost.
 Prefer subagents for context-heavy exploration, isolated implementation from an
 approved plan, independent test work, and fresh-context final review.
 
-Use the fewest agents necessary. Do not hard-code a fixed subagent role pipeline; choose roles from the actual task boundaries. Parallelize only independent read-heavy work.
+Use the fewest agents necessary. Do not hard-code a fixed subagent role pipeline;
+choose roles from the actual task boundaries. Parallelize only independent
+read-heavy work.
 Run agents sequentially when they share files, contracts, decisions, or mutable
 state. Unless explicitly justified, do not run more than two subagents
 concurrently.
