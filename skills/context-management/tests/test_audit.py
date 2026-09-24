@@ -330,6 +330,53 @@ class AuditTests(unittest.TestCase):
                 "not_performed",
             )
 
+    def test_drift_is_reported_per_shard_so_fresh_context_does_not_mask_stale_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.com"],
+                cwd=repo,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Test"],
+                cwd=repo,
+                check=True,
+            )
+            write(repo / "source.txt", "committed\n")
+            subprocess.run(["git", "add", "source.txt"], cwd=repo, check=True)
+            subprocess.run(
+                ["git", "commit", "-qm", "source"],
+                cwd=repo,
+                check=True,
+            )
+            write_agents(
+                repo,
+                "- [Stale](.agents/contexts/stale.md): stale\n"
+                "- [Fresh](.agents/contexts/fresh.md): fresh",
+            )
+            stale = repo / ".agents" / "contexts" / "stale.md"
+            fresh = repo / ".agents" / "contexts" / "fresh.md"
+            write(stale, "# Stale\n")
+            write(fresh, "# Fresh\n")
+            old = 1_000_000_000
+            future = 4_000_000_000
+            os.utime(stale, (old, old))
+            os.utime(fresh, (future, future))
+            os.utime(repo / "AGENTS.md", (future, future))
+
+            _code, data, _output = run_context_ops(repo, "audit")
+            drift = [
+                f
+                for f in data["findings"]
+                if f["code"] == "SOURCE_CHANGED_SINCE_CONTEXT"
+            ]
+
+            self.assertEqual(len(drift), 1)
+            self.assertEqual(drift[0]["file"], ".agents/contexts/stale.md")
+            self.assertTrue(drift[0]["details"]["newer_commits"])
+
     def test_git_unavailable_is_info_and_does_not_fail(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repo = Path(tmp)
