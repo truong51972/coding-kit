@@ -75,6 +75,18 @@ Read only the references needed for the task.
 - `references/testing-schema-security.md`
   - Use when writing tests, reviewing security, defining OpenAPI schema, or checking production readiness.
 
+## Migration ownership
+
+For schema changes, edit the authoritative Django models and use the repository's
+canonical migration workflow. Do not hand-edit ordinary auto-generated schema
+migrations merely to avoid running the generator.
+
+Hand-authored migration logic is appropriate when Django explicitly requires or
+supports it for the intended change, such as data migrations, `RunPython`,
+custom operations, or semantics that the autodetector cannot express. Keep such
+migration code scoped, reviewable, and covered by migration or integration
+tests when risk warrants it.
+
 ## Default workflow
 
 When reviewing or implementing a DRF API:
