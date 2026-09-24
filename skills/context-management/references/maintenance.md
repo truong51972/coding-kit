@@ -17,7 +17,10 @@ Use maintenance when:
 ## Allowed
 
 - Compact, merge, split, or rewrite shards inside `.agents/contexts/`.
-- Remove stale shards only when replacement routing is clear.
+- Retire a stale shard only after its durable facts are either intentionally
+  removed or migrated to a clearly owned replacement.
+- Update the managed Context Index in the same change whenever a shard is
+  renamed, merged, split, or retired; do not leave dangling or duplicate routes.
 - Keep the marker-managed block as the compact entry point and Context Index.
 - Run lint, validate, and static audit after mutations.
 
@@ -29,7 +32,11 @@ Use maintenance when:
 - Move shard ownership outside `.agents/contexts/` or managed routing outside
   the `AGENTS.md` marker block.
 
-## Reset
+## Retirement and Reset
+
+Shard retirement is not a reset. Prefer a small, auditable migration: verify
+ownership, move any still-durable facts, update routing, then delete the obsolete
+shard. If authority is ambiguous, stop rather than discarding information.
 
 Reset is not routine maintenance. Ask for explicit confirmation before deleting
 or replacing the existing context system.
