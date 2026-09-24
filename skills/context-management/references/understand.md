@@ -41,9 +41,13 @@ trivial tasks that do not need repository knowledge.
    source files to open.
 6. Read any other shard only when it directly affects the current task.
 7. Open source files when they own the requested change or are needed to verify context.
-8. If context and source files disagree, trust the source files and treat context as stale.
-9. Keep a note for the later sync phase when a durable context fact appears
-   drifted.
+8. If context and source files disagree, trust the owning source and treat the
+   affected context fact as stale.
+9. If source files disagree with each other, use explicit ownership and priority
+   rules from `source-priority.md`. Recency alone is not authority. If no rule
+   resolves the conflict, keep the ambiguity visible and ask rather than guess.
+10. Keep a note for the later sync phase when a durable context fact appears
+    drifted.
 
 ## Selection Heuristics
 
