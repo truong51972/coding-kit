@@ -1,6 +1,0 @@
-# Merge these settings into ~/.codex/config.toml if desired.
-# Custom agent files already select their own model aliases.
-
-[agents]
-enabled = true
-max_concurrent_threads_per_session = 2

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Python Monorepo Architecture"
-  short_description: "Guide Python monorepo app layout"
-  default_prompt: "Use $python-monorepo-architecture to add or review a Python app, package, Dockerfile, or compose service in this monorepo."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Celery Worker"
-  short_description: "Guide production Celery workers"
-  default_prompt: "Use $celery-worker to design or review Celery task boundaries, routing, lifecycle, and tests."

@@ -1,7 +1,0 @@
-interface:
-  display_name: "Context Management"
-  short_description: "Maintain durable, source-grounded repo context"
-  default_prompt: "Use $context-management to manage durable repository context, invoking it implicitly when .agents/contexts/index.md exists."
-
-policy:
-  allow_implicit_invocation: true

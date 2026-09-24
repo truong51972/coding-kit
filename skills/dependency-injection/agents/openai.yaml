@@ -1,4 +1,0 @@
-interface:
-  display_name: "Dependency Injection"
-  short_description: "Guide Python dependency injection"
-  default_prompt: "Use $dependency-injection to design or review Python DI containers, resources, and test overrides."
