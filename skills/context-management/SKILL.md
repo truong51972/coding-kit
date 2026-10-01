@@ -1,6 +1,6 @@
 ---
 name: context-management
-description: Manage durable repo context when AGENTS.md has the context-management managed marker or users request setup, review, sync, cleanup, or hook-assisted continuity.
+description: Manage durable repo context when AGENTS.md has the context-management managed marker or users request setup, review, sync, cleanup, migration, or hook-assisted continuity.
 ---
 
 # Context Management
@@ -15,6 +15,11 @@ Apply this skill implicitly for non-trivial repository work when `AGENTS.md`
 contains one valid `context-management` managed marker pair. Do not initialize
 context merely because the skill is available. Use [init.md](references/init.md)
 only when the user requests setup or repository instructions enable it.
+
+If an existing Context Management layout is older than the currently installed
+skill/template conventions, use [migrate.md](references/migrate.md) instead of
+forcing re-initialization. Migration must preserve custom routes and semantically
+audit old durable knowledge before moving or removing it.
 
 Own `.agents/contexts/**` plus only the small marker-managed registration block
 in `AGENTS.md`. Keep that block limited to activation and the Context Index; do
@@ -33,7 +38,8 @@ recency alone choose the winner.
 Host lifecycle hooks may re-surface Context Management routing at session start,
 subagent start, and compaction boundaries. They are context providers/injectors,
 not a second lifecycle engine: a hook firing does not mean `understand`, semantic
-audit, `sync`, or maintenance has run, and hooks must not mutate durable context.
+audit, `sync`, migration, or maintenance has run, and hooks must not mutate
+durable context.
 
 Keep hook output small and pointer-oriented. Re-read the managed registration
 block and lazy-load only the shard needed next rather than injecting full shards.
@@ -42,6 +48,9 @@ Antigravity/`agy`, and OpenCode adapters and their host-specific limitations.
 
 ## Lifecycle
 
+0. Run **MIGRATE** first when an existing Context Management layout predates the
+   currently installed conventions or the user asks to migrate/update it. Read
+   [migrate.md](references/migrate.md).
 1. Run **UNDERSTAND** before substantial work. Read
    [understand.md](references/understand.md).
 2. Work against owning source files.
@@ -85,9 +94,11 @@ owning source instead of copying the detail.
 
 ## Compatibility
 
-Interpret old `update` requests as **SYNC**. Fold routine `clear` cleanup into
-**SYNC**; use **MAINTENANCE** for broad cleanup. Never reset, delete, or
-reinitialize an existing context system without an explicit request.
+Interpret old `update` requests as **SYNC**. Treat requests to bring an existing
+Context Management installation to the current layout as **MIGRATE**, not
+`init --overwrite`. Fold routine `clear` cleanup into **SYNC**; use
+**MAINTENANCE** for broad cleanup. Never reset, delete, or reinitialize an
+existing context system without an explicit request.
 
 ## Helper CLI
 
@@ -116,7 +127,7 @@ stale shard. All JSON output must retain
 
 `init --overwrite` is retained only for compatibility. It may skip existing
 starter shards that still match the shipped templates, but it must refuse to
-replace any modified/developed shard.
+replace any modified/developed shard. It is not a migration command.
 
 ## Completion
 
@@ -124,4 +135,6 @@ replace any modified/developed shard.
   independently.
 - Resolve conflicts in favor of source and sync only durable deltas.
 - Run `lint` and `validate` after context edits; review `audit` findings.
+- For migrations, preserve custom routes, account for old durable knowledge,
+  and report unresolved ambiguity instead of discarding it.
 - Report accepted warnings without claiming semantic verification.
