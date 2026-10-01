@@ -4,6 +4,10 @@ Use this operation when the user asks to create a fresh context system for a
 repo, or repository instructions explicitly enable context management and
 the managed context block is absent or the user asks to establish it.
 
+If Context Management already exists but follows an older layout, do not use
+`init` to rewrite it. Use [migrate.md](migrate.md) so existing knowledge and
+custom shard routes are audited and preserved.
+
 ## Goal
 
 Create `.agents/contexts/` starter shards plus only a minimal marker-managed
@@ -21,19 +25,22 @@ or asks you to inspect source files.
    block immediately after its H1 while preserving every other byte. If it is
    absent, create a minimal file with that block. A valid existing managed block
    is idempotent and is never overwritten, including with `--overwrite`.
-3. Fail before writing when a present marker is missing its counterpart,
+3. If an existing managed block or legacy context layout needs structural or
+   semantic conversion, stop initialization and run **MIGRATE** instead. Do not
+   normalize old content mechanically through `init`.
+4. Fail before writing when a present marker is missing its counterpart,
    markers are mismatched or duplicated, or when legacy
    `.agents/contexts/index.md` or `working-conventions.md` remains to be
    semantically migrated.
-4. Run the helper script:
+5. Run the helper script:
 
    ```bash
    python3 /path/to/context-management/scripts/context_ops.py init <repo-path>
    ```
 
-5. If the user provided project details, place them in the correct shard as current-state baseline.
-6. If `.agents/context.md` exists, mention that legacy context was found, but do not migrate it unless explicitly requested.
-7. Keep generated files minimal and generic.
+6. If the user provided project details, place them in the correct shard as current-state baseline.
+7. If `.agents/context.md` exists, treat it as migration input rather than copying it automatically.
+8. Keep generated files minimal and generic.
 
 ## Starter File Intent
 
@@ -62,7 +69,7 @@ or asks you to inspect source files.
 ## Avoid
 
 - Do not auto-migrate legacy `.agents/context.md` or silently replace a legacy
-  context layout.
+  context layout; hand it to the MIGRATE workflow.
 - Do not invent project-specific shards before the repo needs them.
 - Do not fill context files with placeholder prose that future sessions must clean up.
 - Do not grow the managed `AGENTS.md` block into a second context shard.
