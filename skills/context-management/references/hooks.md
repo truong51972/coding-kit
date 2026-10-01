@@ -52,16 +52,58 @@ than replacing existing hooks.
 Typical locations:
 
 - Claude Code: `~/.claude/settings.json` or `<repo>/.claude/settings.json`.
-- Codex: `~/.codex/hooks.json` or `<repo>/.codex/hooks.json`.
+- Codex: `${CODEX_HOME:-$HOME/.codex}/hooks.json` or `<repo>/.codex/hooks.json`.
 
-The shipped command assumes the normal coding-kit install location:
+### Registering the hook after `npx skills`
+
+Portable skill installers install the skill files but do not necessarily register
+host runtime hooks. After installing `context-management` for Codex, run the
+hook helper from the actual installed skill directory:
+
+```bash
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py codex install
+```
+
+If the installer placed or copied the skill under Codex's agent-specific global
+directory instead, run the same helper there:
+
+```bash
+python3 ~/.codex/skills/context-management/scripts/hook_ops.py codex install
+```
+
+The helper discovers `context_provider.py` relative to itself, so it does not
+hard-code either skill installation layout. It writes to `CODEX_HOME/hooks.json`
+when `CODEX_HOME` is set and otherwise to `~/.codex/hooks.json`.
+
+The operation is idempotent. It removes stale Context Management registrations,
+adds the current `SessionStart` and `SubagentStart` entries, and preserves
+unrelated hook events, handlers, and top-level JSON fields. Invalid existing JSON
+fails without rewriting the file.
+
+Inspect or remove only this integration with:
+
+```bash
+python3 /path/to/context-management/scripts/hook_ops.py codex status
+python3 /path/to/context-management/scripts/hook_ops.py codex remove
+```
+
+`status` returns success only when both required Context Management event hooks
+are present. `remove` deletes only command handlers that point to the Context
+Management provider with `--host claude-codex`; unrelated hooks remain intact.
+
+Hook registration does not bypass Codex hook trust or managed-policy controls.
+Review/trust the installed hook when Codex asks. The helper also does not modify
+`config.toml` or enable feature flags on the user's behalf.
+
+The shipped manual hook template assumes the normal coding-kit canonical install
+location:
 
 ```text
 ${AGENTS_HOME:-$HOME/.agents}/skills/context-management/
 ```
 
-If the skill lives elsewhere, change the command to the absolute installed path.
-Codex requires non-managed hooks to be reviewed/trusted before they execute.
+If the skill lives elsewhere, prefer `hook_ops.py codex install`; it resolves the
+provider path from the installed skill automatically.
 
 The shared Python provider handles only `SessionStart` and `SubagentStart`:
 
