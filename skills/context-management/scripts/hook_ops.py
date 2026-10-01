@@ -19,6 +19,8 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 HOOK_TEMPLATE = SKILL_ROOT / "hooks" / "claude-codex-hooks.json"
 PROVIDER = SKILL_ROOT / "hooks" / "context_provider.py"
 REQUIRED_CODEX_EVENTS = {"SessionStart", "SubagentStart"}
+SCOPES = ("project", "global")
+OPERATIONS = ("install", "status", "remove")
 
 
 class HookConfigError(ValueError):
@@ -38,6 +40,36 @@ def _codex_home(explicit: str | None) -> Path:
     if configured:
         return Path(configured).expanduser()
     return Path.home() / ".codex"
+
+
+def _project_root(explicit: str | None) -> Path:
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        completed = None
+    if completed and completed.returncode == 0 and completed.stdout.strip():
+        return Path(completed.stdout.strip()).resolve()
+    return Path.cwd().resolve()
+
+
+def _target_path(
+    scope: str,
+    *,
+    project_root: str | None = None,
+    codex_home: str | None = None,
+) -> Path:
+    if scope == "project":
+        return _project_root(project_root) / ".codex" / "hooks.json"
+    if scope == "global":
+        return _codex_home(codex_home) / "hooks.json"
+    raise HookConfigError(f"unsupported scope: {scope}")
 
 
 def _load_json(path: Path, *, missing_ok: bool = False) -> dict[str, Any]:
@@ -100,7 +132,9 @@ def _is_context_management_handler(handler: Any) -> bool:
     return "context_provider.py" in normalized and "--host claude-codex" in command
 
 
-def _strip_context_management_hooks(config: dict[str, Any]) -> tuple[dict[str, Any], int]:
+def _strip_context_management_hooks(
+    config: dict[str, Any],
+) -> tuple[dict[str, Any], int]:
     updated = copy.deepcopy(config)
     hooks = updated.get("hooks")
     if hooks is None:
@@ -176,8 +210,7 @@ def _atomic_write_json(path: Path, data: dict[str, Any]) -> None:
         raise
 
 
-def codex_install(home: Path) -> int:
-    target = home / "hooks.json"
+def codex_install(target: Path) -> int:
     try:
         current = _load_json(target, missing_ok=True)
         updated, removed = _strip_context_management_hooks(current)
@@ -193,7 +226,10 @@ def codex_install(home: Path) -> int:
     for event, groups in desired.items():
         existing = hooks.setdefault(event, [])
         if not isinstance(existing, list):
-            print(f"error: existing hooks.json event {event!r} must contain a list", file=sys.stderr)
+            print(
+                f"error: existing hooks.json event {event!r} must contain a list",
+                file=sys.stderr,
+            )
             return 2
         existing.extend(copy.deepcopy(groups))
 
@@ -209,8 +245,7 @@ def codex_install(home: Path) -> int:
     return 0
 
 
-def codex_status(home: Path) -> int:
-    target = home / "hooks.json"
+def codex_status(target: Path) -> int:
     try:
         current = _load_json(target, missing_ok=True)
     except HookConfigError as error:
@@ -229,8 +264,7 @@ def codex_status(home: Path) -> int:
     return 1
 
 
-def codex_remove(home: Path) -> int:
-    target = home / "hooks.json"
+def codex_remove(target: Path) -> int:
     try:
         current = _load_json(target, missing_ok=True)
         updated, removed = _strip_context_management_hooks(current)
@@ -251,24 +285,86 @@ def codex_remove(home: Path) -> int:
     return 0
 
 
+def _menu_choice(prompt: str, options: tuple[str, ...], default: str) -> str:
+    print(prompt)
+    for index, option in enumerate(options, start=1):
+        suffix = " [default]" if option == default else ""
+        print(f"  {index}. {option.capitalize()}{suffix}")
+    raw = input("> ").strip()
+    if not raw:
+        return default
+    if raw.isdigit():
+        index = int(raw)
+        if 1 <= index <= len(options):
+            return options[index - 1]
+    lowered = raw.lower()
+    if lowered in options:
+        return lowered
+    raise HookConfigError(f"invalid choice: {raw}")
+
+
+def _interactive_args() -> tuple[str, str, str]:
+    print("Context Management hooks")
+    operation = _menu_choice("Action:", OPERATIONS, "install")
+    scope = _menu_choice("Scope:", SCOPES, "project")
+    return "codex", operation, scope
+
+
+def _run_operation(host: str, operation: str, target: Path) -> int:
+    if host != "codex":
+        print(f"error: unsupported host: {host}", file=sys.stderr)
+        return 2
+    if operation == "install":
+        return codex_install(target)
+    if operation == "status":
+        return codex_status(target)
+    return codex_remove(target)
+
+
 def main() -> int:
+    if len(sys.argv) == 1:
+        try:
+            host, operation, scope = _interactive_args()
+        except (EOFError, KeyboardInterrupt):
+            print("\ncancelled")
+            return 130
+        except HookConfigError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 2
+        target = _target_path(scope)
+        print(f"target: {target}")
+        return _run_operation(host, operation, target)
+
     parser = argparse.ArgumentParser(
         description="Manage Context Management runtime hook registration."
     )
     parser.add_argument("host", choices=("codex",))
-    parser.add_argument("operation", choices=("install", "status", "remove"))
+    parser.add_argument("operation", choices=OPERATIONS)
+    parser.add_argument(
+        "--scope",
+        choices=SCOPES,
+        default="project",
+        help="Hook registration scope. Defaults to project.",
+    )
+    parser.add_argument(
+        "--project-root",
+        help="Project root for project scope. Defaults to the Git root, then cwd.",
+    )
     parser.add_argument(
         "--codex-home",
-        help="Override CODEX_HOME/~/.codex for testing or custom installations.",
+        help="Override CODEX_HOME/~/.codex for global scope.",
     )
     args = parser.parse_args()
 
-    home = _codex_home(args.codex_home)
-    if args.operation == "install":
-        return codex_install(home)
-    if args.operation == "status":
-        return codex_status(home)
-    return codex_remove(home)
+    if args.scope == "project" and args.codex_home:
+        parser.error("--codex-home is only valid with --scope global")
+
+    target = _target_path(
+        args.scope,
+        project_root=args.project_root,
+        codex_home=args.codex_home,
+    )
+    return _run_operation(args.host, args.operation, target)
 
 
 if __name__ == "__main__":

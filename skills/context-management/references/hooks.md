@@ -52,40 +52,64 @@ than replacing existing hooks.
 Typical locations:
 
 - Claude Code: `~/.claude/settings.json` or `<repo>/.claude/settings.json`.
-- Codex: `${CODEX_HOME:-$HOME/.codex}/hooks.json` or `<repo>/.codex/hooks.json`.
+- Codex project: `<repo>/.codex/hooks.json`.
+- Codex global: `${CODEX_HOME:-$HOME/.codex}/hooks.json`.
+
+Project-local Codex hooks are the default for Context Management because the
+provider is useful only in repositories that opted into the managed marker. Codex
+loads project-local hooks only for trusted projects.
 
 ### Registering the hook after `npx skills`
 
 Portable skill installers install the skill files but do not necessarily register
-host runtime hooks. After installing `context-management` for Codex, run the
-hook helper from the actual installed skill directory:
+host runtime hooks. Run the helper from the actual installed skill directory.
+With no arguments it opens a small menu:
+
+```bash
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py
+```
+
+The menu asks for the action and scope. Defaults are:
+
+```text
+Action: Install
+Scope:  Project
+```
+
+Project scope resolves the Git root when available, falls back to the current
+working directory, and writes `<project>/.codex/hooks.json`.
+
+For scripting, use the explicit CLI. Project remains the default scope:
 
 ```bash
 python3 ~/.agents/skills/context-management/scripts/hook_ops.py codex install
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py codex status
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py codex remove
 ```
 
-If the installer placed or copied the skill under Codex's agent-specific global
-directory instead, run the same helper there:
+Use global scope explicitly when the hook should apply to every Codex project:
 
 ```bash
-python3 ~/.codex/skills/context-management/scripts/hook_ops.py codex install
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py \
+  codex install --scope global
 ```
 
-The helper discovers `context_provider.py` relative to itself, so it does not
-hard-code either skill installation layout. It writes to `CODEX_HOME/hooks.json`
-when `CODEX_HOME` is set and otherwise to `~/.codex/hooks.json`.
+For non-Git projects or automation, override the project root explicitly:
+
+```bash
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py \
+  codex install --project-root /path/to/project
+```
+
+`CODEX_HOME` and `--codex-home` apply only to global scope. The helper discovers
+`context_provider.py` relative to itself, so it does not hard-code whether the
+skill was installed under `~/.agents/skills/`, `~/.codex/skills/`, or another
+location.
 
 The operation is idempotent. It removes stale Context Management registrations,
 adds the current `SessionStart` and `SubagentStart` entries, and preserves
 unrelated hook events, handlers, and top-level JSON fields. Invalid existing JSON
 fails without rewriting the file.
-
-Inspect or remove only this integration with:
-
-```bash
-python3 /path/to/context-management/scripts/hook_ops.py codex status
-python3 /path/to/context-management/scripts/hook_ops.py codex remove
-```
 
 `status` returns success only when both required Context Management event hooks
 are present. `remove` deletes only command handlers that point to the Context
@@ -102,8 +126,8 @@ location:
 ${AGENTS_HOME:-$HOME/.agents}/skills/context-management/
 ```
 
-If the skill lives elsewhere, prefer `hook_ops.py codex install`; it resolves the
-provider path from the installed skill automatically.
+If the skill lives elsewhere, prefer `hook_ops.py`; it resolves the provider path
+from the installed skill automatically.
 
 The shared Python provider handles only `SessionStart` and `SubagentStart`:
 
