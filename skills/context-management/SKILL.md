@@ -1,6 +1,6 @@
 ---
 name: context-management
-description: Manage durable repo context when AGENTS.md has the context-management managed marker or users request setup, review, sync, or cleanup.
+description: Manage durable repo context when AGENTS.md has the context-management managed marker or users request setup, review, sync, cleanup, or hook-assisted continuity.
 ---
 
 # Context Management
@@ -24,6 +24,18 @@ their exact details. Treat source as authoritative whenever it conflicts with
 context. When two source artifacts disagree, resolve authority from explicit
 ownership and priority rules before deciding what context is stale; do not let
 recency alone choose the winner.
+
+## Optional host hooks
+
+Host lifecycle hooks may re-surface Context Management routing at session start,
+subagent start, and compaction boundaries. They are context providers/injectors,
+not a second lifecycle engine: a hook firing does not mean `understand`, semantic
+audit, `sync`, or maintenance has run, and hooks must not mutate durable context.
+
+Keep hook output small and pointer-oriented. Re-read the managed block and
+lazy-load only the shard needed next rather than injecting full shards. See
+[hooks.md](references/hooks.md) for the supported Claude Code, Codex,
+Antigravity/`agy`, and OpenCode adapters and their host-specific limitations.
 
 ## Lifecycle
 
@@ -56,6 +68,10 @@ owning source instead of copying the detail.
 
 - Read the managed block in `AGENTS.md` first and use its Context Index as the
   only routing source.
+- Treat hook-injected reminders as routing signals only; they do not count as a
+  loaded shard or as source verification.
+- After compaction, re-establish the managed block and only the context directly
+  needed for the active task. Do not bulk-reload all shards.
 - Load one shard at a time only when the current task needs it.
 - Do not map a task category to a default bundle of several shards.
 - Load `source-priority.md` only for ownership, canonical read order, source

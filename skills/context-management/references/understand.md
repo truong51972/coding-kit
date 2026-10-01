@@ -9,6 +9,18 @@ Load the smallest useful amount of context needed to work accurately.
 `understand` is lazy-loading: parse the marker-managed block in `AGENTS.md`,
 then open one linked shard only when the current task gives a clear reason.
 
+## Hook-assisted activation
+
+A host hook may inject a short reminder at session start, subagent start, or
+after compaction. Treat that reminder only as an activation/routing signal. It
+does not replace reading the managed block, it does not mean any shard is
+loaded, and it does not prove that source was verified.
+
+After compaction, use the compacted task state to continue the current task,
+then re-read the managed block and only the shard directly needed next. In a
+subagent, do not assume that parent-loaded shards were inherited. Keep the same
+lazy-loading and source-verification rules below.
+
 ## Trigger
 
 Run before:
@@ -73,5 +85,6 @@ requests setup.
 - Do not load every shard by default.
 - Do not make task categories eager-loading shortcuts for several shards.
 - Do not read `source-priority.md` automatically after the managed block; it is also lazy-loaded.
+- Do not treat a hook reminder as proof that a shard is loaded or current.
 - Do not treat context files as proof that source files are current.
 - Do not edit context during `understand` unless the user explicitly asks.

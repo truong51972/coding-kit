@@ -1,0 +1,28 @@
+{
+  "description": "Context Management bootstrap, subagent, and post-compaction continuity hooks.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact|fork",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host claude-codex",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host claude-codex",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}
