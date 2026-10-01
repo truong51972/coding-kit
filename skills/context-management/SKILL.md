@@ -16,10 +16,13 @@ contains one valid `context-management` managed marker pair. Do not initialize
 context merely because the skill is available. Use [init.md](references/init.md)
 only when the user requests setup or repository instructions enable it.
 
-Own only `.agents/contexts/**` and the marker-managed block in `AGENTS.md`.
-Never analyze or modify the rest of `AGENTS.md`; initialization may locate its
-H1 only to insert the managed block without changing surrounding bytes. Let
-source code, schemas, configuration, tests, and canonical documentation own
+Own `.agents/contexts/**` plus only the small marker-managed registration block
+in `AGENTS.md`. Keep that block limited to activation and the Context Index; do
+not turn it into a repository-context shard. Never analyze or modify the rest of
+`AGENTS.md`; initialization may locate its H1 only to insert the registration
+block without changing surrounding bytes.
+
+Let source code, schemas, configuration, tests, and canonical documentation own
 their exact details. Treat source as authoritative whenever it conflicts with
 context. When two source artifacts disagree, resolve authority from explicit
 ownership and priority rules before deciding what context is stale; do not let
@@ -32,9 +35,9 @@ subagent start, and compaction boundaries. They are context providers/injectors,
 not a second lifecycle engine: a hook firing does not mean `understand`, semantic
 audit, `sync`, or maintenance has run, and hooks must not mutate durable context.
 
-Keep hook output small and pointer-oriented. Re-read the managed block and
-lazy-load only the shard needed next rather than injecting full shards. See
-[hooks.md](references/hooks.md) for the supported Claude Code, Codex,
+Keep hook output small and pointer-oriented. Re-read the managed registration
+block and lazy-load only the shard needed next rather than injecting full shards.
+See [hooks.md](references/hooks.md) for the supported Claude Code, Codex,
 Antigravity/`agy`, and OpenCode adapters and their host-specific limitations.
 
 ## Lifecycle
@@ -66,8 +69,8 @@ owning source instead of copying the detail.
 
 ## Loading rules
 
-- Read the managed block in `AGENTS.md` first and use its Context Index as the
-  only routing source.
+- Read the managed registration block in `AGENTS.md` first and use its Context
+  Index as the only routing source.
 - Treat hook-injected reminders as routing signals only; they do not count as a
   loaded shard or as source verification.
 - After compaction, re-establish the managed block and only the context directly
@@ -76,7 +79,8 @@ owning source instead of copying the detail.
 - Do not map a task category to a default bundle of several shards.
 - Load `source-priority.md` only for ownership, canonical read order, source
   conflicts, or drift repair.
-- Keep routing and eager repository-wide conventions in the managed block.
+- Keep durable repository knowledge in `.agents/contexts/`; `AGENTS.md` is only
+  an activation/index surface.
 - Add or split shards only when more targeted loading becomes useful.
 
 ## Compatibility
