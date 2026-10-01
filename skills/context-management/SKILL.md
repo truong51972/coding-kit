@@ -12,15 +12,12 @@ session.
 ## Activation and ownership
 
 Apply this skill implicitly for non-trivial repository work when `AGENTS.md`
-contains one valid `context-management` managed marker pair. Do not initialize
-context merely because the skill is available. Use [init.md](references/init.md)
-only when the user requests setup or repository instructions enable it.
+contains one valid `context-management` managed marker pair.
 
 Own `.agents/contexts/**` plus only the small marker-managed registration block
 in `AGENTS.md`. Keep that block limited to activation and the Context Index; do
 not turn it into a repository-context shard. Never analyze or modify the rest of
-`AGENTS.md`; initialization may locate its H1 only to insert the registration
-block without changing surrounding bytes.
+`AGENTS.md`.
 
 Let source code, schemas, configuration, tests, and canonical documentation own
 their exact details. Treat source as authoritative whenever it conflicts with
@@ -86,17 +83,16 @@ owning source instead of copying the detail.
 ## Compatibility
 
 Interpret old `update` requests as **SYNC**. Fold routine `clear` cleanup into
-**SYNC**; use **MAINTENANCE** for broad cleanup. For an explicit migration request
-or a clearly legacy Context Management layout, read
-[migrate.md](references/migrate.md). Never reset, delete, or reinitialize an
-existing context system without an explicit request.
+**SYNC**; use **MAINTENANCE** for broad cleanup. For explicit first-time setup,
+read [init.md](references/init.md). For an explicit migration request or a
+clearly legacy layout, read [migrate.md](references/migrate.md). Never reset,
+delete, or reinitialize an existing context system without an explicit request.
 
 ## Helper CLI
 
 Use the deterministic helper for structure and hygiene, not semantic proof:
 
 ```bash
-python3 /path/to/context-management/scripts/context_ops.py init [repo-path]
 python3 /path/to/context-management/scripts/context_ops.py lint [repo-path]
 python3 /path/to/context-management/scripts/context_ops.py scan [repo-path]
 python3 /path/to/context-management/scripts/context_ops.py validate [repo-path]
@@ -115,10 +111,6 @@ size, duplication, and identifier density do not establish semantic alignment.
 Drift checks are shard-local so a recently edited shard cannot hide an older
 stale shard. All JSON output must retain
 `semantic_source_verification.status: not_performed`.
-
-`init --overwrite` is retained only for compatibility. It may skip existing
-starter shards that still match the shipped templates, but it must refuse to
-replace any modified/developed shard.
 
 ## Completion
 
