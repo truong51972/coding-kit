@@ -11,16 +11,28 @@ SCRIPT = SKILL_ROOT / "scripts" / "hook_ops.py"
 PROVIDER = SKILL_ROOT / "hooks" / "context_provider.py"
 
 
-def _run(home: Path, operation: str) -> subprocess.CompletedProcess[str]:
+def _run(
+    operation: str,
+    *,
+    cwd: Path,
+    scope: str | None = None,
+    codex_home: Path | None = None,
+    project_root: Path | None = None,
+    stdin: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    command = [sys.executable, str(SCRIPT)]
+    if stdin is None:
+        command += ["codex", operation]
+        if scope is not None:
+            command += ["--scope", scope]
+        if codex_home is not None:
+            command += ["--codex-home", str(codex_home)]
+        if project_root is not None:
+            command += ["--project-root", str(project_root)]
     return subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT),
-            "codex",
-            operation,
-            "--codex-home",
-            str(home),
-        ],
+        command,
+        cwd=cwd,
+        input=stdin,
         text=True,
         capture_output=True,
         check=False,
@@ -38,21 +50,61 @@ def _commands(config: dict) -> list[str]:
     return commands
 
 
-def test_install_preserves_unrelated_hooks_and_uses_installed_provider(tmp_path: Path) -> None:
-    home = tmp_path / "codex"
-    home.mkdir()
-    target = home / "hooks.json"
+def _init_git_repo(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q"], cwd=path, check=True)
+
+
+def test_default_scope_installs_project_hook(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+
+    result = _run("install", cwd=repo)
+
+    assert result.returncode == 0, result.stderr
+    target = repo / ".codex" / "hooks.json"
+    assert target.exists()
+    config = json.loads(target.read_text(encoding="utf-8"))
+    managed = [c for c in _commands(config) if "--host claude-codex" in c]
+    assert len(managed) == 2
+    assert str(PROVIDER.resolve()) in managed[0]
+
+
+def test_global_scope_uses_codex_home(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    home = tmp_path / "codex-home"
+
+    result = _run("install", cwd=repo, scope="global", codex_home=home)
+
+    assert result.returncode == 0, result.stderr
+    assert (home / "hooks.json").exists()
+    assert not (repo / ".codex" / "hooks.json").exists()
+
+
+def test_project_root_override_works_outside_git(tmp_path: Path) -> None:
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    project = tmp_path / "project"
+
+    result = _run("install", cwd=cwd, project_root=project)
+
+    assert result.returncode == 0, result.stderr
+    assert (project / ".codex" / "hooks.json").exists()
+
+
+def test_install_is_idempotent_and_preserves_unrelated_hooks(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+    target = repo / ".codex" / "hooks.json"
+    target.parent.mkdir()
     target.write_text(
         json.dumps(
             {
                 "custom": {"keep": True},
                 "hooks": {
                     "SessionStart": [
-                        {
-                            "hooks": [
-                                {"type": "command", "command": "echo unrelated"}
-                            ]
-                        }
+                        {"hooks": [{"type": "command", "command": "echo unrelated"}]}
                     ]
                 },
             }
@@ -60,75 +112,58 @@ def test_install_preserves_unrelated_hooks_and_uses_installed_provider(tmp_path:
         encoding="utf-8",
     )
 
-    result = _run(home, "install")
+    first = _run("install", cwd=repo)
+    second = _run("install", cwd=repo)
 
-    assert result.returncode == 0, result.stderr
+    assert first.returncode == 0, first.stderr
+    assert second.returncode == 0, second.stderr
     config = json.loads(target.read_text(encoding="utf-8"))
     assert config["custom"] == {"keep": True}
     commands = _commands(config)
     assert "echo unrelated" in commands
-    managed = [command for command in commands if "--host claude-codex" in command]
-    assert len(managed) == 2
-    assert str(PROVIDER.resolve()) in managed[0]
-    assert "${AGENTS_HOME" not in managed[0]
+    assert len([c for c in commands if "--host claude-codex" in c]) == 2
 
 
-def test_install_is_idempotent(tmp_path: Path) -> None:
-    home = tmp_path / "codex"
-
-    first = _run(home, "install")
-    second = _run(home, "install")
-
-    assert first.returncode == 0, first.stderr
-    assert second.returncode == 0, second.stderr
-    config = json.loads((home / "hooks.json").read_text(encoding="utf-8"))
-    managed = [
-        command for command in _commands(config) if "--host claude-codex" in command
-    ]
-    assert len(managed) == 2
+def test_status_and_remove_default_to_project(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+    assert _run("status", cwd=repo).returncode == 1
+    assert _run("install", cwd=repo).returncode == 0
+    assert _run("status", cwd=repo).returncode == 0
+    assert _run("remove", cwd=repo).returncode == 0
+    assert _run("status", cwd=repo).returncode == 1
 
 
-def test_status_and_remove_round_trip(tmp_path: Path) -> None:
-    home = tmp_path / "codex"
-    assert _run(home, "status").returncode == 1
-    assert _run(home, "install").returncode == 0
+def test_menu_defaults_to_install_project(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
 
-    status = _run(home, "status")
-    assert status.returncode == 0
-    assert "installed:" in status.stdout
-
-    removed = _run(home, "remove")
-    assert removed.returncode == 0
-    assert "removed:" in removed.stdout
-    assert _run(home, "status").returncode == 1
-
-
-def test_remove_preserves_unrelated_hooks(tmp_path: Path) -> None:
-    home = tmp_path / "codex"
-    assert _run(home, "install").returncode == 0
-    target = home / "hooks.json"
-    config = json.loads(target.read_text(encoding="utf-8"))
-    config["hooks"].setdefault("Stop", []).append(
-        {"hooks": [{"type": "command", "command": "echo keep-me"}]}
-    )
-    target.write_text(json.dumps(config), encoding="utf-8")
-
-    result = _run(home, "remove")
+    result = _run("", cwd=repo, stdin="\n\n")
 
     assert result.returncode == 0, result.stderr
-    config = json.loads(target.read_text(encoding="utf-8"))
-    assert "echo keep-me" in _commands(config)
-    assert not any("--host claude-codex" in command for command in _commands(config))
+    assert "Action:" in result.stdout
+    assert "Scope:" in result.stdout
+    assert "target:" in result.stdout
+    assert (repo / ".codex" / "hooks.json").exists()
 
 
 def test_invalid_existing_json_fails_without_rewrite(tmp_path: Path) -> None:
-    home = tmp_path / "codex"
-    home.mkdir()
-    target = home / "hooks.json"
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+    target = repo / ".codex" / "hooks.json"
+    target.parent.mkdir()
     original = "{not-json\n"
     target.write_text(original, encoding="utf-8")
 
-    result = _run(home, "install")
+    result = _run("install", cwd=repo)
 
     assert result.returncode == 2
     assert target.read_text(encoding="utf-8") == original
+
+
+def test_codex_home_rejected_for_project_scope(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+    result = _run("install", cwd=repo, codex_home=tmp_path / "home")
+    assert result.returncode == 2
+    assert "--codex-home is only valid with --scope global" in result.stderr
