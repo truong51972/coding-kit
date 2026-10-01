@@ -1,6 +1,6 @@
 ---
 name: context-management
-description: Manage durable repo context when AGENTS.md has the context-management managed marker or users request setup, review, sync, cleanup, or hook-assisted continuity.
+description: Manage durable repo context when AGENTS.md has the context-management managed marker or users request review, sync, cleanup, or hook-assisted continuity.
 ---
 
 # Context Management
@@ -61,7 +61,7 @@ Store a fact only when it is at least one of these:
 
 Do not store session summaries, task history, temporary TODOs, one-time test
 results, or narration of recent edits. For exact API, task, schema, migration,
-configuration, or implementation details, store a concise pointer to the
+configuration, and implementation details, store a concise pointer to the
 owning source instead of copying the detail.
 
 ## Loading rules
@@ -80,13 +80,17 @@ owning source instead of copying the detail.
   an activation/index surface.
 - Add or split shards only when more targeted loading becomes useful.
 
+## Rare operations
+
+For explicit first-time setup, read [init.md](references/init.md). For an
+explicit migration request or clearly legacy Context Management layout, read
+[migrate.md](references/migrate.md). Keep both flows out of normal work.
+
 ## Compatibility
 
 Interpret old `update` requests as **SYNC**. Fold routine `clear` cleanup into
-**SYNC**; use **MAINTENANCE** for broad cleanup. For explicit first-time setup,
-read [init.md](references/init.md). For an explicit migration request or a
-clearly legacy layout, read [migrate.md](references/migrate.md). Never reset,
-delete, or reinitialize an existing context system without an explicit request.
+**SYNC**; use **MAINTENANCE** for broad cleanup. Never reset, delete, or
+reinitialize an existing context system without an explicit request.
 
 ## Helper CLI
 
@@ -100,6 +104,9 @@ python3 /path/to/context-management/scripts/context_ops.py audit [repo-path]
 python3 /path/to/context-management/scripts/context_ops.py audit --strict [repo-path]
 python3 /path/to/context-management/scripts/context_ops.py status [repo-path]
 ```
+
+Rare setup/migration commands belong in their reference workflows instead of
+the hot-path skill instructions.
 
 Keep all existing commands compatible. Treat `scan` as the `lint` alias.
 Treat `lint` as the hygiene gate and `validate` as the structure gate. Treat
