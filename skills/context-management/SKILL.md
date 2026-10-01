@@ -1,6 +1,6 @@
 ---
 name: context-management
-description: Manage durable repo context when AGENTS.md has the context-management managed marker or users request setup, review, sync, or cleanup.
+description: Manage durable repo context when AGENTS.md has the context-management managed marker or users request review, sync, cleanup, or hook-assisted continuity.
 ---
 
 # Context Management
@@ -12,18 +12,30 @@ session.
 ## Activation and ownership
 
 Apply this skill implicitly for non-trivial repository work when `AGENTS.md`
-contains one valid `context-management` managed marker pair. Do not initialize
-context merely because the skill is available. Use [init.md](references/init.md)
-only when the user requests setup or repository instructions enable it.
+contains one valid `context-management` managed marker pair.
 
-Own only `.agents/contexts/**` and the marker-managed block in `AGENTS.md`.
-Never analyze or modify the rest of `AGENTS.md`; initialization may locate its
-H1 only to insert the managed block without changing surrounding bytes. Let
-source code, schemas, configuration, tests, and canonical documentation own
+Own `.agents/contexts/**` plus only the small marker-managed registration block
+in `AGENTS.md`. Keep that block limited to activation and the Context Index; do
+not turn it into a repository-context shard. Never analyze or modify the rest of
+`AGENTS.md`.
+
+Let source code, schemas, configuration, tests, and canonical documentation own
 their exact details. Treat source as authoritative whenever it conflicts with
 context. When two source artifacts disagree, resolve authority from explicit
 ownership and priority rules before deciding what context is stale; do not let
 recency alone choose the winner.
+
+## Optional host hooks
+
+Host lifecycle hooks may re-surface Context Management routing at session start,
+subagent start, and compaction boundaries. They are context providers/injectors,
+not a second lifecycle engine: a hook firing does not mean `understand`, semantic
+audit, `sync`, or maintenance has run, and hooks must not mutate durable context.
+
+Keep hook output small and pointer-oriented. Re-read the managed registration
+block and lazy-load only the shard needed next rather than injecting full shards.
+See [hooks.md](references/hooks.md) for the supported Claude Code, Codex,
+Antigravity/`agy`, and OpenCode adapters and their host-specific limitations.
 
 ## Lifecycle
 
@@ -49,19 +61,30 @@ Store a fact only when it is at least one of these:
 
 Do not store session summaries, task history, temporary TODOs, one-time test
 results, or narration of recent edits. For exact API, task, schema, migration,
-configuration, or implementation details, store a concise pointer to the
+configuration, and implementation details, store a concise pointer to the
 owning source instead of copying the detail.
 
 ## Loading rules
 
-- Read the managed block in `AGENTS.md` first and use its Context Index as the
-  only routing source.
+- Read the managed registration block in `AGENTS.md` first and use its Context
+  Index as the only routing source.
+- Treat hook-injected reminders as routing signals only; they do not count as a
+  loaded shard or as source verification.
+- After compaction, re-establish the managed block and only the context directly
+  needed for the active task. Do not bulk-reload all shards.
 - Load one shard at a time only when the current task needs it.
 - Do not map a task category to a default bundle of several shards.
 - Load `source-priority.md` only for ownership, canonical read order, source
   conflicts, or drift repair.
-- Keep routing and eager repository-wide conventions in the managed block.
+- Keep durable repository knowledge in `.agents/contexts/`; `AGENTS.md` is only
+  an activation/index surface.
 - Add or split shards only when more targeted loading becomes useful.
+
+## Rare operations
+
+For explicit first-time setup, read [init.md](references/init.md). For an
+explicit migration request or clearly legacy Context Management layout, read
+[migrate.md](references/migrate.md). Keep both flows out of normal work.
 
 ## Compatibility
 
@@ -74,7 +97,6 @@ reinitialize an existing context system without an explicit request.
 Use the deterministic helper for structure and hygiene, not semantic proof:
 
 ```bash
-python3 /path/to/context-management/scripts/context_ops.py init [repo-path]
 python3 /path/to/context-management/scripts/context_ops.py lint [repo-path]
 python3 /path/to/context-management/scripts/context_ops.py scan [repo-path]
 python3 /path/to/context-management/scripts/context_ops.py validate [repo-path]
@@ -82,6 +104,9 @@ python3 /path/to/context-management/scripts/context_ops.py audit [repo-path]
 python3 /path/to/context-management/scripts/context_ops.py audit --strict [repo-path]
 python3 /path/to/context-management/scripts/context_ops.py status [repo-path]
 ```
+
+Rare setup/migration commands belong in their reference workflows instead of
+the hot-path skill instructions.
 
 Keep all existing commands compatible. Treat `scan` as the `lint` alias.
 Treat `lint` as the hygiene gate and `validate` as the structure gate. Treat
@@ -93,10 +118,6 @@ size, duplication, and identifier density do not establish semantic alignment.
 Drift checks are shard-local so a recently edited shard cannot hide an older
 stale shard. All JSON output must retain
 `semantic_source_verification.status: not_performed`.
-
-`init --overwrite` is retained only for compatibility. It may skip existing
-starter shards that still match the shipped templates, but it must refuse to
-replace any modified/developed shard.
 
 ## Completion
 

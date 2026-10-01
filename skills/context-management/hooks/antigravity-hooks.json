@@ -1,0 +1,11 @@
+{
+  "context-management": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host antigravity",
+        "timeout": 3
+      }
+    ]
+  }
+}

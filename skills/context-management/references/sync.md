@@ -34,12 +34,11 @@ details already clear from source.
    artifacts conflict, resolve declared ownership/priority first; do not sync
    whichever file merely changed last.
 4. Remove stale, duplicated, historical, overly detailed, or misplaced content.
-5. Add or rewrite durable current-state knowledge.
+5. Add or rewrite durable current-state knowledge in `.agents/contexts/`.
 6. Preserve concise source references rather than copied detail.
-7. Update the managed Context Index only when shard routing changes. Promote a
-   fact into Project Working Conventions only when it is durable, repo-wide,
-   and worth eager loading; never auto-copy content merely because headings
-   match.
+7. Update the managed Context Index only when shard routing changes. Keep the
+   rest of the `AGENTS.md` managed block registration-only; do not promote
+   repository knowledge or conventions into it.
 8. Run `context_ops.py lint`.
 9. Run `context_ops.py validate`.
 10. Run `context_ops.py audit`.
