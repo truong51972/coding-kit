@@ -369,16 +369,63 @@ def _scan(project: Path) -> list[tuple[str, bool]]:
     return sorted(result, key=lambda item: (not item[1], PROVIDERS.index(item[0])))
 
 
-def _choose(title: str, options: list[tuple[str, str]], default: str) -> str:
+def _section(title: str) -> None:
+    print()
     print(title)
-    for i, (value, label) in enumerate(options, 1):
-        print(f"  {i}. {label}{'  [default]' if value == default else ''}")
-    raw = input("> ").strip().lower()
+    print("-" * len(title))
+
+
+def _table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> None:
+    widths = [len(header) for header in headers]
+    for row in rows:
+        for index, cell in enumerate(row):
+            widths[index] = max(widths[index], len(cell))
+    print("  " + "  ".join(header.ljust(widths[i]) for i, header in enumerate(headers)))
+    print("  " + "  ".join("-" * widths[i] for i in range(len(headers))))
+    for row in rows:
+        print("  " + "  ".join(cell.ljust(widths[i]) for i, cell in enumerate(row)))
+
+
+def _choose(title: str, options: list[tuple[str, str]], default: str) -> str:
+    _section(title)
+    rows = [
+        (str(i), label, "default" if value == default else "")
+        for i, (value, label) in enumerate(options, 1)
+    ]
+    _table(("#", "Option", ""), rows)
+    default_index = next(i for i, (value, _) in enumerate(options, 1) if value == default)
+    raw = input(f"\nChoice [{default_index}]: ").strip().lower()
     if not raw:
         return default
     if raw.isdigit() and 1 <= int(raw) <= len(options):
         return options[int(raw) - 1][0]
     if raw in {value for value, _ in options}:
+        return raw
+    raise HookError(f"invalid choice: {raw}")
+
+
+def _choose_provider(
+    scanned: list[tuple[str, bool]], default: str
+) -> str:
+    _section("2) Provider")
+    rows = []
+    for index, (name, detected) in enumerate(scanned, 1):
+        rows.append(
+            (
+                str(index),
+                NAMES[name],
+                "detected" if detected else "-",
+                "recommended" if name == default else "",
+            )
+        )
+    _table(("#", "Provider", "Status", "Recommendation"), rows)
+    default_index = next(i for i, (name, _) in enumerate(scanned, 1) if name == default)
+    raw = input(f"\nChoice [{default_index}]: ").strip().lower()
+    if not raw:
+        return default
+    if raw.isdigit() and 1 <= int(raw) <= len(scanned):
+        return scanned[int(raw) - 1][0]
+    if raw in {name for name, _ in scanned}:
         return raw
     raise HookError(f"invalid choice: {raw}")
 
@@ -415,8 +462,10 @@ def _quick_state(provider: str, target: Path) -> str:
 
 def _interactive() -> tuple[str, str, str, int | None]:
     project = _project_root()
+    print()
     print("Context Management Hooks")
-    print(f"Project: {project}\n")
+    print("========================")
+    _table(("Context", "Value"), [("Project", str(project)), ("Provider asset", "ready" if PROVIDER.is_file() else "missing")])
 
     scope = _choose(
         "1) Scope",
@@ -426,21 +475,23 @@ def _interactive() -> tuple[str, str, str, int | None]:
 
     scanned = _scan(project)
     recommended = next((name for name, found in scanned if found), "codex")
-    provider = _choose(
-        "\n2) Provider",
-        [
-            (name, f"{NAMES[name]}{'  ✓ detected / recommended' if found else ''}")
-            for name, found in scanned
-        ],
-        recommended,
-    )
+    provider = _choose_provider(scanned, recommended)
 
     target = _target(provider, scope)
-    print(f"\nTarget: {target}")
-    print(f"State:  {_quick_state(provider, target)}")
+    state = _quick_state(provider, target)
+    _section("Selection")
+    _table(
+        ("Field", "Value"),
+        [
+            ("Scope", "Project" if scope == "project" else "Local"),
+            ("Provider", NAMES[provider]),
+            ("State", state),
+            ("Target", str(target)),
+        ],
+    )
 
     operation = _choose(
-        "\n3) Action",
+        "3) Action",
         [("install", "Install / update"), ("status", "Show status"), ("remove", "Remove")],
         "install",
     )
@@ -449,9 +500,11 @@ def _interactive() -> tuple[str, str, str, int | None]:
     if provider == "opencode" and operation == "install":
         major = _opencode_major(None)
         if major is None:
-            major = int(_choose("\nOpenCode major", [("2", "V2"), ("1", "V1")], "2"))
+            major = int(_choose("OpenCode major", [("2", "V2"), ("1", "V1")], "2"))
         else:
-            print(f"\nOpenCode v{major} detected.")
+            _section("OpenCode")
+            print(f"  Detected major version: v{major}")
+    print()
     return provider, operation, scope, major
 
 
