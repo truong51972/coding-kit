@@ -34,6 +34,6 @@ handler and let the agent call "experience_ops.py list --query ..." on demand.
 
 For isolated tool/hook testing:
 
-\`\`\`sh
+```sh
 python3 -m unittest discover -s skills/experiences/tests -v
-\`\`\`
+```
