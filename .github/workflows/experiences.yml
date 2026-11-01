@@ -1,17 +1,15 @@
-name: Experiences and Context Management tests
+name: Experiences tests
 
 on:
   pull_request:
     paths:
       - "skills/experiences/**"
-      - "skills/context-management/**"
       - "README.md"
       - ".github/workflows/experiences.yml"
   push:
     branches: [main]
     paths:
       - "skills/experiences/**"
-      - "skills/context-management/**"
 
 permissions:
   contents: read
@@ -28,5 +26,5 @@ jobs:
         run: python -m pip install "pytest>=8,<10"
       - name: Compile scripts
         run: python -m compileall -q skills/experiences
-      - name: Run experience and context-management regression tests
-        run: python -m pytest -q skills/experiences/tests skills/context-management/tests
+      - name: Run experience regression tests
+        run: python -m pytest -q skills/experiences/tests
