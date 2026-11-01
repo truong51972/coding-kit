@@ -24,11 +24,11 @@ an experience captures a failed approach, root cause, and validated resolution.
 
 Use a cheap, deterministic index instead of reading every experience:
 
-\`\`\`sh
+```sh
 python3 /path/to/experiences/scripts/experience_ops.py list --limit 12
 python3 /path/to/experiences/scripts/experience_ops.py list --query "pytest import"
 python3 /path/to/experiences/scripts/experience_ops.py show pytest-wrong-interpreter
-\`\`\`
+```
 
 "list" prints only name, description, path (or --json for structured output).
 It searches personal + local notebooks and applies lightweight keyword ranking.
@@ -42,7 +42,7 @@ validated resolution, applicability boundary, and evidence (test/PR/source
 reference). Prefer one small reusable lesson over a chronological incident log.
 For exact code, configuration, or commands that change, store pointers to source.
 
-\`\`\`sh
+```sh
 python3 /path/to/experiences/scripts/experience_ops.py capture \
   --name pytest-wrong-interpreter \
   --description "Import errors when pytest uses the wrong interpreter" \
@@ -53,7 +53,7 @@ python3 /path/to/experiences/scripts/experience_ops.py capture \
   --applicability "Only when interpreter mismatch is confirmed" \
   --evidence "Validated by passing pytest using the project interpreter" \
   --tags "python,pytest,environment" --verified
-\`\`\`
+```
 
 Default capture scope is project; pass "--scope global" only for truly
 cross-project lessons. The command refuses to overwrite an existing filename
@@ -62,10 +62,10 @@ and needs explicit --verified. It does not independently prove the evidence.
 Run lint after edits. To stop recommending an invalid lesson, use retire
 (which preserves the record):
 
-\`\`\`sh
+```sh
 python3 /path/to/experiences/scripts/experience_ops.py lint
 python3 /path/to/experiences/scripts/experience_ops.py retire pytest-wrong-interpreter
-\`\`\`
+```
 
 Frontmatter intentionally supports only single-line name, description, status,
 tags; no YAML dependency. Each lesson has the six required "##" sections.
@@ -84,11 +84,11 @@ auto-saves lessons.
 For a host-independent tool wrapper, provide a stable session id and command
 output via stdin:
 
-\`\`\`sh
+```sh
 printf '%s\n' 'ModuleNotFoundError: sample' | \
 python3 /path/to/experiences/scripts/failure_guard.py observe \
   --session-id my-session --command 'uv run pytest' --exit-code 1
-\`\`\`
+```
 
 Each execution of the command above is an observation; after a third matching
 failure it prints a hint. Real hooks can supply automatic observations.
