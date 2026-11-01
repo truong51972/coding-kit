@@ -81,7 +81,7 @@ class ExperienceTests(unittest.TestCase):
         self.assertIn("--verified", unverified.stderr)
 
     def test_global_and_project_precedence(self):
-        self.assertEqual(self.capture("--scope", "global").returncode, 0)
+        self.assertEqual(self.capture("pytest-wrong-interpreter", "--scope", "global").returncode, 0)
         self.assertEqual(self.capture().returncode, 0)
         global_path = self.tmp / "home/experiences/pytest-wrong-interpreter.md"
         self.assertTrue(global_path.is_file())
@@ -161,9 +161,8 @@ class ExperienceTests(unittest.TestCase):
         text = output["hookSpecificOutput"]["additionalContext"]
         self.assertIn("pytest-wrong-interpreter:", text)
         self.assertNotIn("Reinstalling deps", text)
-        self.assertEqual(provider.handle({"hook_event_name": "SessionStart",
-                                          "cwd": str(self.tmp / "empty")}), output
-                         if False else None)  # no repo- or personal-level lessons there
+        self.assertIsNone(provider.handle({"hook_event_name": "SessionStart",
+                                               "cwd": str(self.tmp / "empty")}))
 
 
 if __name__ == "__main__":
