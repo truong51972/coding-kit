@@ -43,7 +43,11 @@ trivial tasks that do not need repository knowledge.
    the sole shard-routing source.
 2. Determine the task scope from the user request and repository paths already
    implicated by the task.
-3. Decide from the index which shard, if any, is needed next.
+3. Decide from the index which file or folder, if any, is needed next.
+   For a folder route (trailing `/`), discover Markdown paths in that folder
+   only when it is relevant; choose the matching file by path/name before
+   opening its contents. A registered folder includes nested subfolders.
+   Never read all files from a folder just to discover what is available.
    Load shards individually; do not preload a multi-shard bundle merely because
    the task matches a broad category.
 4. Read `source-priority.md` only when the task involves source ownership,
@@ -70,8 +74,10 @@ trivial tasks that do not need repository knowledge.
 - Load `source-priority.md` for source ownership, read order, file roles, source-of-truth conflicts, or drift repair.
 - Load `project-baseline.md` for product, domain, architecture, document narrative, scope, or audience questions.
 - Load `active-assumptions.md` when decisions depend on constraints, defaults, limits, or unresolved operating assumptions.
-- Load optional context shards only when the managed Context Index says they are
-  relevant; retrieve experiences separately through the metadata catalog.
+- Load optional context shards only when the managed Context Index routes to
+  their file or containing folder. A folder listing is discovery metadata, not
+  permission to load its contents. Retrieve experiences separately through the
+  metadata catalog.
 
 ## Source Verification
 
@@ -87,7 +93,7 @@ requests setup.
 
 ## Avoid
 
-- Do not load every shard or experience by default.
+- Do not load every shard, every file in an indexed folder, or every experience by default.
 - Do not make task categories eager-loading shortcuts for several shards.
 - Do not read `source-priority.md` automatically after the managed block; it is also lazy-loaded.
 - Do not treat a hook reminder as proof that a shard is loaded or current.

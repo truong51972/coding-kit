@@ -431,6 +431,19 @@ class AuditTests(unittest.TestCase):
             )
             self.assertEqual(total["details"]["files"], 2)
 
+    def test_folder_shards_are_audited_without_orphan_warning(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            write_agents(repo, "- [Suites](suites/): suite contexts")
+            write(root / "suites" / "checkout.md", "# Checkout\n")
+
+            code, data, output = run_context_ops(repo, "audit")
+
+            self.assertEqual(code, 0, output)
+            self.assertNotIn("ORPHAN_SHARD", {f["code"] for f in data["findings"]})
+            self.assertEqual(data["semantic_source_verification"]["status"], "not_performed")
+
 
 if __name__ == "__main__":
     unittest.main()
