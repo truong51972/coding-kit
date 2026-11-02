@@ -1,147 +1,114 @@
-# Codex Skills
+# Coding Kit
 
-A collection of reusable Codex skills for Python services, application architecture, and durable repository context. Each skill is self-contained under [`skills/`](skills/).
+Reusable **Agent Skills** for Python backend engineering, LLM prompt design, and durable coding-agent knowledge. Each skill is self-contained under [`skills/`](skills/) and can be installed independently with the [`skills` CLI](https://github.com/vercel-labs/skills).
 
-## Repository layout
+The collection is not tied to Codex: choose whichever agent your `skills` CLI supports (for example, Codex, Claude Code, or OpenCode). Host-specific hooks are optional and require separate setup.
 
-```text
-.
-├── skills/
-│   ├── celery-worker/
-│   ├── context-management/
-│   ├── dependency-injection/
-│   ├── experiences/
-│   ├── drf-api-architecture/
-│   ├── python-monorepo-architecture/
-│   └── system-prompt-builder/
-├── install.sh
-├── LICENSE
-└── README.md
+## Quick start
+
+**Prerequisite:** Node.js 22.20+ with `npm`/`npx`. No custom Coding Kit installer, Python virtual environment, or repository clone is required just to install skills.
+
+From a project directory, run:
+
+```sh
+npx skills add truong51972/coding-kit
 ```
 
-The installer discovers directories matching `skills/*/SKILL.md` in the selected Git ref. New skills become installable without changes to `install.sh`.
+This opens the CLI's interactive selection for skills and target agents. **Project-local installation is the default.** To make a skill available across projects, add `-g`:
+
+```sh
+npx skills add truong51972/coding-kit -g -a codex
+```
+
+Install specific skills without prompts:
+
+```sh
+npx skills add truong51972/coding-kit \
+  --skill context-management --skill experiences \
+  -g -a codex -y
+```
+
+Or install all available skills for a chosen agent:
+
+```sh
+npx skills add truong51972/coding-kit --skill '*' -a codex -g -y
+```
+
+`--all` is different: it selects **all skills and all supported agents** without prompts. Use it only when that is your intention.
 
 ## Available skills
 
-| Skill | Purpose |
+| Skill | Use it for |
 | --- | --- |
-| `celery-worker` | Design and review Celery tasks, routing, lifecycle, scheduling, and tests. |
-| `context-management` | Set up and maintain durable, source-grounded repository context. |
-| `experiences` | Store verified debugging lessons with a lightweight catalog and optional failure-loop guard. |
-| `dependency-injection` | Design Python dependency injection across FastAPI, Celery, CLI, resources, and tests. |
-| `drf-api-architecture` | Design and review Django REST Framework API boundaries, object access, workflows, and contracts. |
-| `python-monorepo-architecture` | Maintain Python monorepos built with uv, Docker, and Compose. |
-| `system-prompt-builder` | Build and review production system/developer prompts for LLM applications. |
+| [`celery-worker`](skills/celery-worker/SKILL.md) | Celery task boundaries, acknowledgements, retries, broker routing, Django producers, worker lifecycle, and integration tests. |
+| [`context-management`](skills/context-management/SKILL.md) | Source-grounded repository memory under `.agents/contexts/`, with lazy loading, semantic audit, sync, maintenance, and optional continuity hooks. |
+| [`dependency-injection`](skills/dependency-injection/SKILL.md) | Python DI and resource lifecycle across FastAPI, Celery, CLI entry points, and test overrides. |
+| [`drf-api-architecture`](skills/drf-api-architecture/SKILL.md) | Django REST Framework API boundaries, serializers, scoped object access, workflows, asynchronous job endpoints, and contracts. |
+| [`experiences`](skills/experiences/SKILL.md) | A verified failure/solution notebook, metadata-first retrieval, and an optional advisory repeated-failure guard. |
+| [`python-monorepo-architecture`](skills/python-monorepo-architecture/SKILL.md) | Python app/package boundaries, `uv` dependency management, Dockerfiles, Compose, and monorepo layouts. |
+| [`system-prompt-builder`](skills/system-prompt-builder/SKILL.md) | Production system/developer prompts for structured extraction, RAG, tool agents, routers, evaluators, and coding agents. |
 
-## Requirements
+Skills have task-specific references and, where needed, helper scripts, hook adapters, examples, or tests. The agent should load relevant references on demand rather than ingesting every file.
 
-Installation requires a POSIX-compatible `sh`, `curl`, `tar`, and `mktemp`.
-
-Skills are installed into `${AGENTS_HOME:-$HOME/.agents}/skills`.
-
-## Quick install
-
-Install every skill from the latest `main` branch:
+## Discover, manage, and update
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh | sh -s -- --all
+# Inspect this repository's skills without installing them
+npx skills add truong51972/coding-kit --list
+
+# Show installed skills (or only global installs)
+npx skills list
+npx skills ls -g
+
+# Check for updates, then update installed skills
+npx skills check
+npx skills update -g
 ```
 
-## Interactive selection
+Use `npx skills update` for the interactive project/global update flow, or `npx skills update -p` for project-only updates. See the [CLI reference](https://github.com/vercel-labs/skills/blob/main/docs/commands.md) for all supported agents, scopes, and flags.
 
-Run the installer without a selection to open a multi-select menu. The menu reads from `/dev/tty`, so it still works when the script itself is piped to `sh`:
+## Optional integrations
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh | sh
+**Context Management** is a repo-level workflow, not an automatically populated memory database. Its activation uses a managed marker/Context Index in the target repository's `AGENTS.md`, with durable shards in `.agents/contexts/`. Follow [`init.md`](skills/context-management/references/init.md) for first-time setup. Optional host hooks can re-surface routing after startup, subagent creation, or compaction; see the [hook setup guide](skills/context-management/references/hooks.md).
+
+**Experiences** stores verified lessons in the target repository's `.agents/experiences/` and optionally in the personal `$AGENTS_HOME/experiences/` notebook. Its Python standard-library CLI can list, capture, lint, or retire lessons. The failure guard only *advises* after repeated matching failures: it does not block commands or automatically save experiences. See the [skill](skills/experiences/SKILL.md) and [hook guide](skills/experiences/references/hooks.md).
+
+Installing a skill with `npx skills` installs its files; **it does not necessarily register runtime hooks** in Codex, Claude Code, OpenCode, or other hosts. Hook commands and paths depend on the agent, installation scope, and platform. Resolve the actual installed skill directory before configuring hooks. Do not assume that Claude's `PostToolUse` hook contract is available in Codex or T3 Code.
+
+The repository's root [`AGENTS.md`](AGENTS.md) is a standalone set of engineering-agent instructions. It is **not** one of the installable skills and is not automatically copied into projects by `npx skills`.
+
+## Repository structure
+
+```text
+coding-kit/
+├── AGENTS.md                   # Standalone engineering-agent guidance
+├── README.md
+├── LICENSE
+├── .github/workflows/          # Targeted regression checks
+└── skills/
+    ├── celery-worker/
+    ├── context-management/
+    ├── dependency-injection/
+    ├── drf-api-architecture/
+    ├── experiences/
+    ├── python-monorepo-architecture/
+    └── system-prompt-builder/
 ```
 
-If no TTY is available, pass `--all` or explicit skill names.
+Each `skills/<name>/SKILL.md` defines the skill's entry point. There is **no repository-specific `install.sh`**; use `npx skills add` to install from this source.
 
-## Non-interactive installation
-
-Install selected skills:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh \
-  | sh -s -- celery-worker context-management
-```
-
-List the skills discovered on `main`:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh \
-  | sh -s -- --list
-```
-
-## Custom refs
-
-Use `--ref` with a branch or tag. The installer downloads and scans that ref rather than relying on a fixed skill list:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh \
-  | sh -s -- --ref develop --all
-```
-
-## Custom `AGENTS_HOME`
-
-Set `AGENTS_HOME` to install somewhere other than `~/.agents`:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/truong51972/coding-kit/main/install.sh \
-  | AGENTS_HOME="$HOME/custom-agents" sh -s -- --all
-```
-
-## Updates and verification
-
-Every run downloads the current archive for the selected ref. Selected skills are staged and validated before their installed directories are replaced completely. Skills that were not selected, including skills from other sources, are preserved.
-
-Verify an installation with:
-
-```sh
-find "${AGENTS_HOME:-$HOME/.agents}/skills" -mindepth 2 -maxdepth 2 -name SKILL.md -print
-```
-
-Restart Codex or begin a new session after installing or updating skills.
-
-## Local development
-
-Clone the repository, then symlink each local skill into your agent home so edits are immediately available:
+## Contributing and local development
 
 ```sh
 git clone https://github.com/truong51972/coding-kit.git
-cd skills
-mkdir -p "${AGENTS_HOME:-$HOME/.agents}/skills"
-for skill_file in skills/*/SKILL.md; do
-  [ -f "$skill_file" ] || continue
-  skill_dir=$(cd "$(dirname "$skill_file")" && pwd)
-  ln -s "$skill_dir" "${AGENTS_HOME:-$HOME/.agents}/skills/$(basename "$skill_dir")"
-done
+cd coding-kit
+
+# Preview skills discovered from the local checkout
+npx skills add . --list
+
+# Run the two Python regression suites (stdlib unittest)
+python3 -m unittest discover -s skills/context-management/tests -v
+python3 -m unittest discover -s skills/experiences/tests -v
 ```
 
-Validate all skill directories during development with the Codex `skill-creator` validator:
-
-```sh
-for skill_file in skills/*/SKILL.md; do
-  python3 /path/to/skill-creator/scripts/quick_validate.py "$(dirname "$skill_file")"
-done
-```
-
-## Experience notebook and failure guard
-
-Install `experiences` as an independent skill. It uses project-local `.agents/experiences/`
-plus optional personal `$AGENTS_HOME/experiences/`; source/config/tests remain authoritative.
-The metadata catalog and capture CLI need only Python 3 and the standard library:
-
-```sh
-python3 "$HOME/.agents/skills/experiences/scripts/experience_ops.py" list --query pytest
-python3 "$HOME/.agents/skills/experiences/scripts/experience_ops.py" lint
-```
-
-The optional Claude Code hook template at
-[`skills/experiences/hooks/claude-hooks.json`](skills/experiences/hooks/claude-hooks.json)
-adds an eight-entry metadata index at session start and an advisory loop guard for Bash.
-Merge it into Claude settings manually; do not replace unrelated host hooks.
-Codex/T3 users can use the catalog and the host-independent `failure_guard.py observe`
-CLI without assuming Claude's PostToolUse events exist.
-See [`skills/experiences/SKILL.md`](skills/experiences/SKILL.md) for verified capture,
-retirement, scope precedence, and failure-loop limitations.
+For prompt authoring, see [`system-prompt-builder`](skills/system-prompt-builder/README.md) and its [linter](skills/system-prompt-builder/scripts/README.md). For skill validation, inspect each `SKILL.md` frontmatter and follow the relevant skill-specific tests. Keep the package's portable install flow in the upstream `skills` CLI rather than adding another installer here.
