@@ -84,10 +84,20 @@ def _starts_for(payload: dict[str, Any]) -> list[str]:
 
 
 def _claude_codex(payload: dict[str, Any]) -> dict[str, Any] | None:
-    if _managed_root(_starts_for(payload)) is None:
+    managed = _managed_root(_starts_for(payload))
+    if managed is None:
         return None
 
     event = payload.get("hook_event_name")
+    if event in ("PostToolUse", "PostToolUseFailure"):
+        # Only supported post-tool hosts should register this event. Never
+        # inspect/modify full experience contents or write repository data.
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+        from failure_guard import handle_hook
+
+        observation = dict(payload)
+        observation["cwd"] = str(managed)
+        return handle_hook(observation)
     if event == "SessionStart":
         context = COMPACT_CONTEXT if payload.get("source") == "compact" else BOOTSTRAP_CONTEXT
     elif event == "SubagentStart":

@@ -150,19 +150,30 @@ class ExperienceTests(unittest.TestCase):
                 "tool_response": {"stderr": "ModuleNotFoundError: sample"}})
         self.assertIn("additionalContext", result["hookSpecificOutput"])
 
-    def test_session_start_only_metadata(self):
+    def test_context_start_does_not_eagerly_inject_experience_index(self):
         self.assertEqual(self.capture().returncode, 0)
+        repo_file = self.repo / "AGENTS.md"
+        repo_file.write_text(
+            "<!-- context-management:start -->\nIndex\n<!-- context-management:end -->\n")
         from importlib.util import spec_from_file_location, module_from_spec
-        spec = spec_from_file_location("experience_provider",
-                                       SKILL / "hooks/experience_provider.py")
+        spec = spec_from_file_location("context_provider",
+                                       SKILL / "hooks/context_provider.py")
         provider = module_from_spec(spec)
         spec.loader.exec_module(provider)
-        output = provider.handle({"hook_event_name": "SessionStart", "cwd": str(self.repo)})
-        text = output["hookSpecificOutput"]["additionalContext"]
-        self.assertIn("pytest-wrong-interpreter:", text)
-        self.assertNotIn("Reinstalling deps", text)
-        self.assertIsNone(provider.handle({"hook_event_name": "SessionStart",
-                                               "cwd": str(self.tmp / "empty")}))
+        output = provider._claude_codex({
+            "hook_event_name": "SessionStart", "source": "startup",
+            "cwd": str(self.repo),
+        })
+        self.assertIn("Context Management is active",
+                      output["hookSpecificOutput"]["additionalContext"])
+        self.assertNotIn("pytest-wrong-interpreter",
+                         output["hookSpecificOutput"]["additionalContext"])
+        self.assertIsNone(provider._claude_codex({
+            "hook_event_name": "PostToolUseFailure",
+            "cwd": str(self.tmp), "session_id": "unmanaged",
+            "tool_name": "Bash", "tool_input": {"command": "pytest"},
+            "tool_response": {"stderr": "ModuleNotFoundError: example"},
+        }))
 
 
 if __name__ == "__main__":
