@@ -228,11 +228,11 @@ class ValidateTests(unittest.TestCase):
             self.assertEqual(code, 2)
             self.assertIn("CONTEXT_REFERENCE_TYPE", {f["code"] for f in data["findings"]})
 
-            (root / "suites").mkdir()
+            (root / "suites.md").mkdir()
             write_agents(repo, "- [Wrong](suites.md): folder treated as file")
             code, data, _ = run_context_ops(repo, "validate")
             self.assertEqual(code, 2)
-            self.assertIn("BROKEN_REFERENCE", {f["code"] for f in data["findings"]})
+            self.assertIn("CONTEXT_REFERENCE_TYPE", {f["code"] for f in data["findings"]})
 
     def test_catch_all_context_root_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -298,6 +298,23 @@ class ValidateTests(unittest.TestCase):
             self.assertEqual(code, 2, output)
             self.assertIn("BROKEN_REFERENCE", {f["code"] for f in data["findings"]})
 
+
+    def test_nested_index_md_is_a_regular_shard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            write_agents(repo, "- [Suites](suites/): suites")
+            write(root / "suites" / "index.md", "# Suite catalog\n")
+
+            code, data, output = run_context_ops(repo, "validate")
+            self.assertEqual(code, 0, output)
+            self.assertFalse(any(f["code"] == "ORPHAN_SHARD" for f in data["findings"]))
+
+            write_agents(repo, "- [Other](other/): other")
+            (root / "other").mkdir()
+            code, data, output = run_context_ops(repo, "validate")
+            self.assertEqual(code, 1, output)
+            self.assertIn("ORPHAN_SHARD", {f["code"] for f in data["findings"]})
 
 if __name__ == "__main__":
     unittest.main()

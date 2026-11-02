@@ -485,7 +485,9 @@ def structural_findings(repo: Path) -> list[Finding]:
             )
 
     for path in iter_markdown_files(root):
-        if path.name in LEGACY_CONTEXT_FILES:
+        # Legacy layout names are reserved only at the contexts root; a
+        # nested suite/index.md is a normal shard and still needs coverage.
+        if path.parent == root and path.name in LEGACY_CONTEXT_FILES:
             continue
         resolved = path.resolve()
         if escapes_repo(root, path):
