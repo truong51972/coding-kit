@@ -30,9 +30,17 @@ It supports:
 
 ## Install
 
-Copy the entire `system-prompt-builder` directory into the skill directory used by your agent environment.
+Use the shared [`skills` CLI](https://github.com/vercel-labs/skills) instead of manually copying skill files:
 
-Keep the directory name unchanged unless your environment explicitly supports renaming skills.
+```sh
+# Install into the current project (select an agent interactively)
+npx skills add truong51972/coding-kit --skill system-prompt-builder
+
+# Install globally for Codex without prompts
+npx skills add truong51972/coding-kit --skill system-prompt-builder -g -a codex -y
+```
+
+Node.js 22.20+ with `npx` is required for the CLI. See the [repository README](../../README.md) for updates, installation scope, and other available skills.
 
 ## Typical requests
 
