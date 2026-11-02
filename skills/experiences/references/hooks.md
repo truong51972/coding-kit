@@ -6,8 +6,11 @@ settings instead of replacing other hooks.
 
 Template: "skills/experiences/hooks/claude-hooks.json".
 Manual configuration location: "~/.claude/settings.json" (global) or
-"<repo>/.claude/settings.json" (project). Set the command path to the **actual**
-installed experiences skill directory if not under AGENTS_HOME/skills.
+"<repo>/.claude/settings.json" (project). `npx skills` installs the skill files,
+not the host-specific hook registration. The template assumes a conventional
+`$AGENTS_HOME/skills/experiences` location; replace its command paths with the
+**actual** installed skill directory when using project-local or agent-specific
+installation. Merge the template rather than overwriting unrelated hooks.
 
 - SessionStart: inject at most eight "name: description" entries, with a pointer
   to the catalog CLI for retrieval. Remains silent if the notebook is empty.
