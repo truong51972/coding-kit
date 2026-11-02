@@ -81,6 +81,24 @@ def test_subagent_gets_non_inheritance_reminder(tmp_path: Path) -> None:
     assert "Do not assume parent-loaded shards were inherited" in text
 
 
+def test_post_tool_guard_is_managed_only_and_advisory(tmp_path: Path) -> None:
+    repo = _managed_repo(tmp_path / "repo")
+    payload = {
+        "hook_event_name": "PostToolUseFailure", "cwd": str(repo),
+        "session_id": "worker-test", "tool_name": "Bash",
+        "tool_input": {"command": "uv run pytest"},
+        "tool_response": {"stderr": "ModuleNotFoundError: sample"},
+    }
+    # Three repeated failed commands; state isolated by session and repo.
+    assert _run("claude-codex", payload, repo) is None
+    assert _run("claude-codex", payload, repo) is None
+    output = _run("claude-codex", payload, repo)
+    assert "Potential failure loop" in output["hookSpecificOutput"]["additionalContext"]
+    assert _run("claude-codex", payload, repo) is None
+    (repo / "AGENTS.md").write_text("# no marker\n")
+    assert _run("claude-codex", payload, repo) is None
+
+
 def test_antigravity_injects_only_on_first_invocation(tmp_path: Path) -> None:
     repo = _managed_repo(tmp_path / "repo")
     first = _run(

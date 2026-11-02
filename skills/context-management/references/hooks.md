@@ -33,7 +33,7 @@ lifecycle event.
 
 | Host | Adapter | Behavior |
 | --- | --- | --- |
-| Claude Code | `hooks/claude-codex-hooks.json` | `SessionStart` bootstrap/resume/compact and `SubagentStart` continuity. |
+| Claude Code | `hooks/claude-codex-hooks.json`; opt-in `hooks/claude-failure-guard-hooks.json` | `SessionStart`/`SubagentStart` continuity; optional Bash post-tool failure detection. |
 | Codex | `hooks/claude-codex-hooks.json` | Same command-hook contract; `SessionStart(source=compact)` restores routing immediately after compaction. |
 | Antigravity / `agy` | `hooks/antigravity-hooks.json` | Uses `PreInvocation`, but injects only when `invocationNum == 0`. There is no native compaction event, so compact recovery is not guaranteed. |
 | OpenCode V1 | `hooks/opencode/v1.ts` | Injects once per session, enriches the compact checkpoint, then performs one continuity injection after compaction. |
@@ -137,6 +137,40 @@ The shared Python provider handles only `SessionStart` and `SubagentStart`:
 
 No context shard content is copied into the hook response.
 
+## Experiences: shared provider, optional Claude post-tool observer
+
+Experience lookup is intentionally **not** injected into SessionStart, and is
+not listed in the Context Index. UNDERSTAND queries `experience_ops.py list`
+only when the current task involves repeated failures or historical lessons.
+
+The same `context_provider.py` can process a Claude Code Bash
+`PostToolUse`/`PostToolUseFailure` event using `failure_guard.py`. To
+enable this extra runtime guard, opt in explicitly:
+
+```bash
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py \
+  claude install --with-failure-guard
+```
+
+This installs the usual session/subagent hooks **plus** a Claude-only post-tool
+observer; no second SessionStart handler and no experience files injected.
+Without the flag, installation remains the former two-event setup. The helper
+removes stale handlers that point to the **old** standalone
+`skills/experiences/hooks/experience_provider.py` when reinstalling; it keeps
+unrelated hooks untouched. Review host-specific support before adding this
+hook to Codex/T3; it is **not enabled** for them by default. Reinstalling
+without the flag removes the extra managed post-tool hooks.
+
+The optional guard only emits a non-blocking suggestion after repeated errors;
+it does not capture, edit or delete lessons. State is local to the session and
+written outside the repository. Unknown exit statuses are ignored if the event
+does not imply failure. For hosts without a compatible post-tool lifecycle,
+use `failure_guard.py observe` manually or omit the runtime guard.
+
+After updating from the former separate `experiences` skill, remove that old
+skill installation via your skill manager when convenient. Its existing
+`.agents/experiences/` and personal notebook data require **no migration**.
+
 ## Antigravity / `agy`
 
 Merge `hooks/antigravity-hooks.json` into `.agents/hooks.json` or the global
@@ -203,7 +237,8 @@ A normal session should see approximately:
 startup             one small reminder
 subagent start       one small reminder per child/agent
 compaction           one small compact instruction + one continuity reminder
-ordinary tool calls  no hook context
+ordinary tool calls  no context injection; optional Claude Bash guard can emit
+                     a single advisory when repeated failures are detected
 ```
 
 The provider should remain much smaller than the shard it points to. If a future

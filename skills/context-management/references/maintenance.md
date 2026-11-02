@@ -24,6 +24,14 @@ Use maintenance when:
 - Keep the marker-managed block as the compact entry point and Context Index.
 - Run lint, validate, and static audit after mutations.
 
+## Experience maintenance is separate
+
+For obsolete, duplicate, or no-longer-applicable lessons, use the experience
+catalog to review them against current owning source. Manually merge distinct
+lessons or retire a stale record with `experience_ops.py retire <slug>`. Do not
+copy lesson content into `.agents/contexts/`, or interpret context-shard audit
+as validation of experience semantics. See [experiences.md](experiences.md).
+
 ## Not Allowed Without Explicit Request
 
 - Delete the entire context system.

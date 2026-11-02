@@ -46,3 +46,13 @@ details already clear from source.
 
 Cleanup is part of sync. Do not run a separate cleanup flow unless maintenance
 conditions apply.
+
+## Independent experience capture
+
+Do not add incident history to context shards, or treat an experience as a
+context delta. After resolving a non-obvious repeatable failure, consider an
+explicit `experience_ops.py capture --verified` with evidence, failed approach,
+root cause, scope, and a tested resolution. Skip one-off errors and unverified
+hypotheses. See [experiences.md](experiences.md). Experience edits have their
+own `experience_ops.py lint` gate; a successful context sync does not prove a
+lesson is correct.
