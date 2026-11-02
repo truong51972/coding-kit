@@ -61,9 +61,11 @@ loads project-local hooks only for trusted projects.
 
 ### Registering the hook after `npx skills`
 
-Portable skill installers install the skill files but do not necessarily register
-host runtime hooks. Run the helper from the actual installed skill directory.
-With no arguments it opens a small menu:
+Installing with `npx skills` provides the skill files but does not necessarily
+register host runtime hooks. The commands below assume the conventional
+global `~/.agents/skills/` location; for a project-local or agent-specific
+installation, replace that prefix with the actual installed skill path.
+Run the helper from that directory. With no arguments it opens a small menu:
 
 ```bash
 python3 ~/.agents/skills/context-management/scripts/hook_ops.py
@@ -119,15 +121,17 @@ Hook registration does not bypass Codex hook trust or managed-policy controls.
 Review/trust the installed hook when Codex asks. The helper also does not modify
 `config.toml` or enable feature flags on the user's behalf.
 
-The shipped manual hook template assumes the normal coding-kit canonical install
+The shipped manual hook template assumes this conventional global install
 location:
 
 ```text
 ${AGENTS_HOME:-$HOME/.agents}/skills/context-management/
 ```
 
-If the skill lives elsewhere, prefer `hook_ops.py`; it resolves the provider path
-from the installed skill automatically.
+If the skill lives elsewhere (including a project-local `npx skills` install),
+prefer `hook_ops.py` from that directory; it resolves the provider path
+relative to itself. Review template commands before enabling them: `npx skills`
+does not rewrite host-specific hook configuration.
 
 The shared Python provider handles only `SessionStart` and `SubagentStart`:
 
