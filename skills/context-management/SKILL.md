@@ -16,7 +16,7 @@ contains one valid `context-management` managed marker pair.
 
 Own `.agents/contexts/**`, `.agents/experiences/**`, and only the small
 marker-managed registration block in `AGENTS.md`. Keep that block limited to
-activation and the **Context Index** (context shards only). Experience files
+activation and the **Context Index** (individual context shards or folders). Experience files
 are discovered by the separate catalog, never duplicated in that index.
 Never analyze or modify the rest of `AGENTS.md`.
 
@@ -86,7 +86,9 @@ owning source instead of copying the detail.
 ## Loading rules
 
 - Read the managed registration block in `AGENTS.md` first and use its Context
-  Index as the only routing source.
+  Index as the only routing source. Index entries may point to a single Markdown
+  shard or a directory ending in `/`. For a matching directory, discover child
+  paths by name and open only the relevant shard, never the whole directory.
 - Treat hook-injected reminders as routing signals only; they do not count as a
   loaded shard or as source verification.
 - After compaction, re-establish the managed block and only the context directly
@@ -98,6 +100,9 @@ owning source instead of copying the detail.
 - Keep current repository facts in `.agents/contexts/` and historical lessons in
   `.agents/experiences/`; `AGENTS.md` is only an activation/context index surface.
 - Add or split shards only when more targeted loading becomes useful.
+- A folder entry covers nested Markdown shards without separate registration;
+  direct file entries remain supported, including inside registered folders.
+  Do not register `.agents/contexts/` itself as a catch-all.
 
 ## Rare operations
 
@@ -151,8 +156,8 @@ compatible post-tool hook. See [experiences.md](references/experiences.md).
 
 ## Completion
 
-- Keep every shard linked from the managed Context Index and lazy-loaded
-  independently.
+- Keep every shard directly linked or covered by an indexed folder, and
+  lazy-loaded independently.
 - Resolve conflicts in favor of source and sync only durable deltas.
 - Run context `lint`/`validate` after context edits and review `audit` findings.
 - Run experience `lint` after lesson edits; never treat syntax checks as proof

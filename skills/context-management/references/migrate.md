@@ -58,9 +58,10 @@ The current target keeps:
 7. **Repair legacy layout** only after its durable content has been accounted for.
    Remove legacy files only when their useful content is represented in the
    current shards or verified unnecessary.
-8. **Re-audit routing** so every current shard that should be discoverable is
-   linked exactly once and no Context Index entry points outside the context
-   directory.
+8. **Re-audit routing** so every current shard is directly linked or covered
+   by a specific indexed folder. Do not duplicate exact routes or point outside
+   the context directory; an explicit file route within an indexed folder is
+   allowed when useful.
 9. Run `context_ops.py lint`, `context_ops.py validate`, and
    `context_ops.py audit`. Resolve deterministic findings where possible.
 10. Report what moved, what was removed as verified noise, and any unresolved

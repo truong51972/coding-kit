@@ -157,6 +157,23 @@ def markdown_link_references(text: str) -> list[tuple[str, int]]:
     return refs
 
 
+def context_index_references(text: str) -> list[tuple[str, int]]:
+    """File and directory routes declared by the managed Context Index.
+
+    A trailing slash identifies a directory route. Unlike ordinary Markdown
+    references, index entries can route to folders of independently loaded
+    shards, without listing each child file in AGENTS.md.
+    """
+    refs: list[tuple[str, int]] = []
+    for match in MARKDOWN_LINK_RE.finditer(text):
+        reference = strip_anchor(match.group(1))
+        if not is_external_reference(reference) and (
+            reference.endswith(".md") or reference.endswith("/")
+        ):
+            refs.append((reference, line_for_offset(text, match.start())))
+    return refs
+
+
 def managed_block(repo: Path) -> tuple[str | None, list[Finding]]:
     path = agents_file(repo)
     if not path.exists():
@@ -382,11 +399,14 @@ def structural_findings(repo: Path) -> list[Finding]:
         return findings
 
     seen_refs: dict[Path, list[tuple[str, int]]] = {}
+    registered_files: set[Path] = set()
+    registered_folders: set[Path] = set()
     index_start = section_start_line(block, "Context Index")
-    for reference, line in markdown_link_references(index_text):
+    for reference, line in context_index_references(index_text):
         adjusted_line = line + index_start - 1
         target = resolve_context_reference(repo, root, reference)
-        seen_refs.setdefault(target.resolve(), []).append((reference, adjusted_line))
+        resolved = target.resolve()
+        seen_refs.setdefault(resolved, []).append((reference, adjusted_line))
         if escapes_repo(root, target):
             findings.append(
                 Finding(
@@ -394,8 +414,22 @@ def structural_findings(repo: Path) -> list[Finding]:
                     "error",
                     relpath(agents_file(repo), repo),
                     adjusted_line,
-                    f"Shard reference escapes context directory: {reference}.",
-                    {"reference": reference, "resolved_to": relpath(target, repo)},
+                    f"Context reference escapes context directory: {reference}.",
+                    {"reference": reference, "resolved_to": relpath(resolved, repo)},
+                )
+            )
+            continue
+
+        is_folder = reference.endswith("/")
+        if is_folder and resolved == root.resolve():
+            findings.append(
+                Finding(
+                    "CONTEXT_ROOT_REGISTRATION",
+                    "error",
+                    relpath(agents_file(repo), repo),
+                    adjusted_line,
+                    "Register a specific context folder, not the entire contexts root.",
+                    {"reference": reference},
                 )
             )
             continue
@@ -407,10 +441,29 @@ def structural_findings(repo: Path) -> list[Finding]:
                     "error",
                     relpath(agents_file(repo), repo),
                     adjusted_line,
-                    f"Context Index references missing context file: {reference}.",
+                    f"Context Index references missing context {'folder' if is_folder else 'file'}: {reference}.",
                     {"reference": reference, "resolved_to": relpath(target, repo)},
                 )
             )
+            continue
+
+        if not (target.is_dir() if is_folder else target.is_file()):
+            findings.append(
+                Finding(
+                    "CONTEXT_REFERENCE_TYPE",
+                    "error",
+                    relpath(agents_file(repo), repo),
+                    adjusted_line,
+                    f"Context Index reference has the wrong target type: {reference}.",
+                    {"reference": reference, "expected": "folder" if is_folder else "file"},
+                )
+            )
+            continue
+
+        if is_folder:
+            registered_folders.add(resolved)
+        else:
+            registered_files.add(resolved)
 
     for target, entries in sorted(seen_refs.items(), key=lambda item: str(item[0])):
         if len(entries) > 1:
@@ -431,22 +484,34 @@ def structural_findings(repo: Path) -> list[Finding]:
                 )
             )
 
-    referenced_paths = {
-        target
-        for target in seen_refs
-        if target.exists()
-    }
     for path in iter_markdown_files(root):
-        if path.name in LEGACY_CONTEXT_FILES:
+        # Legacy layout names are reserved only at the contexts root; a
+        # nested suite/index.md is a normal shard and still needs coverage.
+        if path.parent == root and path.name in LEGACY_CONTEXT_FILES:
             continue
-        if path.resolve() not in referenced_paths:
+        resolved = path.resolve()
+        if escapes_repo(root, path):
+            findings.append(
+                Finding(
+                    "CONTEXT_REFERENCE_ESCAPE",
+                    "error",
+                    relpath(path, repo),
+                    None,
+                    "Context shard resolves outside the context directory.",
+                    {"resolved_to": relpath(resolved, repo)},
+                )
+            )
+            continue
+        if resolved not in registered_files and not any(
+            resolved.is_relative_to(folder) for folder in registered_folders
+        ):
             findings.append(
                 Finding(
                     "ORPHAN_SHARD",
                     "warning",
                     relpath(path, repo),
                     None,
-                    "Context shard is not referenced by the managed Context Index.",
+                    "Context shard is not directly indexed or covered by an indexed folder.",
                 )
             )
 

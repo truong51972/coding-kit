@@ -56,8 +56,10 @@ or asks you to inspect source files.
 - Put source ownership, document roles, config/schema authority, and read conditions in `source-priority.md`.
 - Put project identity, architecture/content shape, scope boundaries, and durable narrative in `project-baseline.md`.
 - Put live constraints, accepted defaults, and future-affecting assumptions in `active-assumptions.md`.
-- Add optional shards when more targeted lazy loading becomes useful, and link
-  them from the managed Context Index.
+- Add optional shards when more targeted lazy loading becomes useful. Register
+  individual Markdown files or specific folders (trailing `/`) in the managed
+  Context Index; a folder route covers all nested Markdown shards without
+  registering each file. Do not register the contexts root as a catch-all.
 - Keep the `AGENTS.md` block registration-only even when repository context grows.
 
 ## Adaptation Examples

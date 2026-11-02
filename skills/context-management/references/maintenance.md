@@ -8,7 +8,7 @@ Use maintenance when:
 
 - A shard grows beyond roughly 4,000 tokens or 250 non-empty lines.
 - There are many duplicate or near-duplicate facts.
-- Shards are orphaned.
+- Shards are neither directly indexed nor covered by an indexed folder.
 - Managed Context Index routing is wrong.
 - Context contains substantial changelog or session noise.
 - Repository architecture changed broadly.
@@ -19,8 +19,9 @@ Use maintenance when:
 - Compact, merge, split, or rewrite shards inside `.agents/contexts/`.
 - Retire a stale shard only after its durable facts are either intentionally
   removed or migrated to a clearly owned replacement.
-- Update the managed Context Index in the same change whenever a shard is
-  renamed, merged, split, or retired; do not leave dangling or duplicate routes.
+- Update the managed Context Index when a direct file route or registered folder
+  changes. Files inside an indexed folder need no individual index entries;
+  do not leave dangling or duplicate routes.
 - Keep the marker-managed block as the compact entry point and Context Index.
 - Run lint, validate, and static audit after mutations.
 

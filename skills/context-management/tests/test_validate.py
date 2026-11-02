@@ -149,5 +149,172 @@ class ValidateTests(unittest.TestCase):
                 )
 
 
+    def test_folder_registration_covers_nested_shards_without_index_expansion(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            write_agents(repo, "- [Suites](.agents/contexts/suites/): test suite contexts")
+            write(root / "suites" / "checkout.md", "# Checkout\n")
+            write(root / "suites" / "nested" / "payment.md", "# Payment\n")
+
+            code, data, output = run_context_ops(repo, "validate")
+
+            self.assertEqual(code, 0, output)
+            self.assertEqual(data["summary"]["warnings"], 0)
+
+    def test_folder_registration_does_not_cover_sibling_or_parent_shards(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            write_agents(repo, "- [Suites](suites/): test suite contexts")
+            write(root / "suites" / "checkout.md", "# Checkout\n")
+            write(root / "outside.md", "# Outside\n")
+            write(root / "other" / "payment.md", "# Payment\n")
+
+            code, data, output = run_context_ops(repo, "validate")
+
+            self.assertEqual(code, 1, output)
+            orphans = {f["file"] for f in data["findings"] if f["code"] == "ORPHAN_SHARD"}
+            self.assertEqual(orphans, {
+                ".agents/contexts/outside.md",
+                ".agents/contexts/other/payment.md",
+            })
+
+    def test_file_route_can_coexist_with_registered_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            write_agents(repo, (
+                "- [Suites](suites/): all suites\n"
+                "- [Checkout](.agents/contexts/suites/checkout.md): direct route"
+            ))
+            write(root / "suites" / "checkout.md", "# Checkout\n")
+            write(root / "suites" / "payment.md", "# Payment\n")
+
+            code, data, output = run_context_ops(repo, "validate")
+
+            self.assertEqual(code, 0, output)
+            self.assertEqual(data["summary"]["warnings"], 0)
+
+    def test_duplicate_folder_route_warns(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            write_agents(repo, (
+                "- [Suites](suites/): all suites\n"
+                "- [Again](.agents/contexts/suites/): duplicate route"
+            ))
+            write(root / "suites" / "checkout.md", "# Checkout\n")
+
+            code, data, output = run_context_ops(repo, "validate")
+
+            self.assertEqual(code, 1, output)
+            self.assertIn("DUPLICATE_CONTENT_WARNING", {f["code"] for f in data["findings"]})
+
+    def test_missing_folder_and_wrong_target_types_are_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            write_agents(repo, "- [Missing](.agents/contexts/missing/): missing")
+            root.mkdir(parents=True)
+
+            code, data, _ = run_context_ops(repo, "validate")
+            self.assertEqual(code, 2)
+            self.assertIn("BROKEN_REFERENCE", {f["code"] for f in data["findings"]})
+
+            write(root / "file.md", "# File\n")
+            write_agents(repo, "- [Wrong](file.md/): file treated as folder")
+            code, data, _ = run_context_ops(repo, "validate")
+            self.assertEqual(code, 2)
+            self.assertIn("CONTEXT_REFERENCE_TYPE", {f["code"] for f in data["findings"]})
+
+            (root / "suites.md").mkdir()
+            write_agents(repo, "- [Wrong](suites.md): folder treated as file")
+            code, data, _ = run_context_ops(repo, "validate")
+            self.assertEqual(code, 2)
+            self.assertIn("CONTEXT_REFERENCE_TYPE", {f["code"] for f in data["findings"]})
+
+    def test_catch_all_context_root_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            root.mkdir(parents=True)
+            write_agents(repo, "- [Everything](.agents/contexts/): unbounded route")
+
+            code, data, output = run_context_ops(repo, "validate")
+
+            self.assertEqual(code, 2, output)
+            self.assertIn("CONTEXT_ROOT_REGISTRATION", {f["code"] for f in data["findings"]})
+
+    def test_folder_path_escape_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            root.mkdir(parents=True)
+            write_agents(repo, "- [Outside](.agents/contexts/../../outside/): escape")
+
+            code, data, output = run_context_ops(repo, "validate")
+
+            self.assertEqual(code, 2, output)
+            self.assertIn("CONTEXT_REFERENCE_ESCAPE", {f["code"] for f in data["findings"]})
+
+    def test_symlinks_cannot_escape_registered_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            outside = repo / "outside"
+            write(outside / "note.md", "# Outside\n")
+            root.mkdir(parents=True)
+            try:
+                (root / "linked").symlink_to(outside, target_is_directory=True)
+            except (OSError, NotImplementedError) as error:
+                self.skipTest(f"symlinks unavailable: {error}")
+
+            write_agents(repo, "- [Linked](linked/): invalid route")
+            code, data, output = run_context_ops(repo, "validate")
+            self.assertEqual(code, 2, output)
+            self.assertIn("CONTEXT_REFERENCE_ESCAPE", {f["code"] for f in data["findings"]})
+
+            (root / "linked").unlink()
+            (root / "suites").mkdir()
+            (root / "suites" / "outside.md").symlink_to(outside / "note.md")
+            write_agents(repo, "- [Suites](suites/): registered directory")
+            code, data, output = run_context_ops(repo, "validate")
+            self.assertEqual(code, 2, output)
+            self.assertIn("CONTEXT_REFERENCE_ESCAPE", {f["code"] for f in data["findings"]})
+
+    def test_file_inside_folder_still_requires_existing_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            (root / "suites").mkdir(parents=True)
+            write_agents(repo, (
+                "- [Suites](suites/): suites\n"
+                "- [Missing](suites/missing.md): explicit broken file route"
+            ))
+
+            code, data, output = run_context_ops(repo, "validate")
+
+            self.assertEqual(code, 2, output)
+            self.assertIn("BROKEN_REFERENCE", {f["code"] for f in data["findings"]})
+
+
+    def test_nested_index_md_is_a_regular_shard(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            root = repo / ".agents" / "contexts"
+            write_agents(repo, "- [Suites](suites/): suites")
+            write(root / "suites" / "index.md", "# Suite catalog\n")
+
+            code, data, output = run_context_ops(repo, "validate")
+            self.assertEqual(code, 0, output)
+            self.assertFalse(any(f["code"] == "ORPHAN_SHARD" for f in data["findings"]))
+
+            write_agents(repo, "- [Other](other/): other")
+            (root / "other").mkdir()
+            code, data, output = run_context_ops(repo, "validate")
+            self.assertEqual(code, 1, output)
+            self.assertIn("ORPHAN_SHARD", {f["code"] for f in data["findings"]})
+
 if __name__ == "__main__":
     unittest.main()
