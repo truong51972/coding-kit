@@ -10,6 +10,7 @@ A collection of reusable Codex skills for Python services, application architect
 │   ├── celery-worker/
 │   ├── context-management/
 │   ├── dependency-injection/
+│   ├── experiences/
 │   ├── drf-api-architecture/
 │   ├── python-monorepo-architecture/
 │   └── system-prompt-builder/
@@ -26,6 +27,7 @@ The installer discovers directories matching `skills/*/SKILL.md` in the selected
 | --- | --- |
 | `celery-worker` | Design and review Celery tasks, routing, lifecycle, scheduling, and tests. |
 | `context-management` | Set up and maintain durable, source-grounded repository context. |
+| `experiences` | Store verified debugging lessons with a lightweight catalog and optional failure-loop guard. |
 | `dependency-injection` | Design Python dependency injection across FastAPI, Celery, CLI, resources, and tests. |
 | `drf-api-architecture` | Design and review Django REST Framework API boundaries, object access, workflows, and contracts. |
 | `python-monorepo-architecture` | Maintain Python monorepos built with uv, Docker, and Compose. |
@@ -123,3 +125,23 @@ for skill_file in skills/*/SKILL.md; do
   python3 /path/to/skill-creator/scripts/quick_validate.py "$(dirname "$skill_file")"
 done
 ```
+
+## Experience notebook and failure guard
+
+Install `experiences` as an independent skill. It uses project-local `.agents/experiences/`
+plus optional personal `$AGENTS_HOME/experiences/`; source/config/tests remain authoritative.
+The metadata catalog and capture CLI need only Python 3 and the standard library:
+
+```sh
+python3 "$HOME/.agents/skills/experiences/scripts/experience_ops.py" list --query pytest
+python3 "$HOME/.agents/skills/experiences/scripts/experience_ops.py" lint
+```
+
+The optional Claude Code hook template at
+[`skills/experiences/hooks/claude-hooks.json`](skills/experiences/hooks/claude-hooks.json)
+adds an eight-entry metadata index at session start and an advisory loop guard for Bash.
+Merge it into Claude settings manually; do not replace unrelated host hooks.
+Codex/T3 users can use the catalog and the host-independent `failure_guard.py observe`
+CLI without assuming Claude's PostToolUse events exist.
+See [`skills/experiences/SKILL.md`](skills/experiences/SKILL.md) for verified capture,
+retirement, scope precedence, and failure-loop limitations.
