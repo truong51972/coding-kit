@@ -52,6 +52,10 @@ trivial tasks that do not need repository knowledge.
 5. If `source-priority.md` is loaded, follow its source roles to decide which
    source files to open.
 6. Read any other shard only when it directly affects the current task.
+   For debugging, recurrent failures, or explicit past-experience requests, run
+   `experience_ops.py list --query '<symptom>'` against the project/personal
+   notebook. Open only a relevant full lesson with `show`; the **Context Index**
+   does not enumerate experience files. See [experiences.md](experiences.md).
 7. Open source files when they own the requested change or are needed to verify context.
 8. If context and source files disagree, trust the owning source and treat the
    affected context fact as stale.
@@ -66,7 +70,8 @@ trivial tasks that do not need repository knowledge.
 - Load `source-priority.md` for source ownership, read order, file roles, source-of-truth conflicts, or drift repair.
 - Load `project-baseline.md` for product, domain, architecture, document narrative, scope, or audience questions.
 - Load `active-assumptions.md` when decisions depend on constraints, defaults, limits, or unresolved operating assumptions.
-- Load optional shards only when the managed Context Index says they are relevant to the task.
+- Load optional context shards only when the managed Context Index says they are
+  relevant; retrieve experiences separately through the metadata catalog.
 
 ## Source Verification
 
@@ -82,7 +87,7 @@ requests setup.
 
 ## Avoid
 
-- Do not load every shard by default.
+- Do not load every shard or experience by default.
 - Do not make task categories eager-loading shortcuts for several shards.
 - Do not read `source-priority.md` automatically after the managed block; it is also lazy-loaded.
 - Do not treat a hook reminder as proof that a shard is loaded or current.

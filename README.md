@@ -24,7 +24,7 @@ Install specific skills without prompts:
 
 ```sh
 npx skills add truong51972/coding-kit \
-  --skill context-management --skill experiences \
+  --skill context-management \
   -g -a codex -y
 ```
 
@@ -41,10 +41,9 @@ npx skills add truong51972/coding-kit --skill '*' -a codex -g -y
 | Skill | Use it for |
 | --- | --- |
 | [`celery-worker`](skills/celery-worker/SKILL.md) | Celery task boundaries, acknowledgements, retries, broker routing, Django producers, worker lifecycle, and integration tests. |
-| [`context-management`](skills/context-management/SKILL.md) | Source-grounded repository memory under `.agents/contexts/`, with lazy loading, semantic audit, sync, maintenance, and optional continuity hooks. |
+| [`context-management`](skills/context-management/SKILL.md) | Lazy-loaded repository context, verified historical experiences, semantic audit, sync, maintenance, and optional continuity/failure-guard hooks. |
 | [`dependency-injection`](skills/dependency-injection/SKILL.md) | Python DI and resource lifecycle across FastAPI, Celery, CLI entry points, and test overrides. |
 | [`drf-api-architecture`](skills/drf-api-architecture/SKILL.md) | Django REST Framework API boundaries, serializers, scoped object access, workflows, asynchronous job endpoints, and contracts. |
-| [`experiences`](skills/experiences/SKILL.md) | A verified failure/solution notebook, metadata-first retrieval, and an optional advisory repeated-failure guard. |
 | [`python-monorepo-architecture`](skills/python-monorepo-architecture/SKILL.md) | Python app/package boundaries, `uv` dependency management, Dockerfiles, Compose, and monorepo layouts. |
 | [`system-prompt-builder`](skills/system-prompt-builder/SKILL.md) | Production system/developer prompts for structured extraction, RAG, tool agents, routers, evaluators, and coding agents. |
 
@@ -69,9 +68,16 @@ Use `npx skills update` for the interactive project/global update flow, or `npx 
 
 ## Optional integrations
 
-**Context Management** is a repo-level workflow, not an automatically populated memory database. Its activation uses a managed marker/Context Index in the target repository's `AGENTS.md`, with durable shards in `.agents/contexts/`. Follow [`init.md`](skills/context-management/references/init.md) for first-time setup. Optional host hooks can re-surface routing after startup, subagent creation, or compaction; see the [hook setup guide](skills/context-management/references/hooks.md).
+**Context Management** is a repo-level workflow, not an automatically populated memory database. Its activation uses a managed marker/Context Index in the target repository's `AGENTS.md`, with lazy-loaded current-state shards in `.agents/contexts/`. Follow [`init.md`](skills/context-management/references/init.md) for first-time setup. Optional host hooks re-surface routing after startup, subagent creation, or compaction; see the [hook setup guide](skills/context-management/references/hooks.md).
 
-**Experiences** stores verified lessons in the target repository's `.agents/experiences/` and optionally in the personal `$AGENTS_HOME/experiences/` notebook. Its Python standard-library CLI can list, capture, lint, or retire lessons. The failure guard only *advises* after repeated matching failures: it does not block commands or automatically save experiences. See the [skill](skills/experiences/SKILL.md) and [hook guide](skills/experiences/references/hooks.md).
+**Verified Experiences** are now managed by `context-management`, **not installed as a separate skill**. Historical lessons remain in the target repository's `.agents/experiences/` or optional personal `$AGENTS_HOME/experiences/` notebook. The standard-library `experience_ops.py` supports metadata-first lookup, capture, lint, and retirement:
+
+```sh
+python3 ~/.agents/skills/context-management/scripts/experience_ops.py list --query pytest
+python3 ~/.agents/skills/context-management/scripts/experience_ops.py lint
+```
+
+The optional Claude Code post-tool failure guard only *advises* after repeated matching failures; it never blocks commands or automatically captures experiences. Enable it explicitly with `hook_ops.py claude install --with-failure-guard`. For applicability, source authority, and host support, see [experience guidance](skills/context-management/references/experiences.md) and [hook setup](skills/context-management/references/hooks.md).
 
 Installing a skill with `npx skills` installs its files; **it does not necessarily register runtime hooks** in Codex, Claude Code, OpenCode, or other hosts. Hook commands and paths depend on the agent, installation scope, and platform. Resolve the actual installed skill directory before configuring hooks. Do not assume that Claude's `PostToolUse` hook contract is available in Codex or T3 Code.
 
@@ -90,7 +96,6 @@ coding-kit/
     ├── context-management/
     ├── dependency-injection/
     ├── drf-api-architecture/
-    ├── experiences/
     ├── python-monorepo-architecture/
     └── system-prompt-builder/
 ```
@@ -106,9 +111,8 @@ cd coding-kit
 # Preview skills discovered from the local checkout
 npx skills add . --list
 
-# Run the two Python regression suites (stdlib unittest)
+# Run Context Management and Experiences regression tests (stdlib unittest)
 python3 -m unittest discover -s skills/context-management/tests -v
-python3 -m unittest discover -s skills/experiences/tests -v
 ```
 
 For prompt authoring, see [`system-prompt-builder`](skills/system-prompt-builder/README.md) and its [linter](skills/system-prompt-builder/scripts/README.md). For skill validation, inspect each `SKILL.md` frontmatter and follow the relevant skill-specific tests. Keep the package's portable install flow in the upstream `skills` CLI rather than adding another installer here.

@@ -1,0 +1,29 @@
+{
+  "description": "Optional Claude-only post-tool failure loop guard using the shared Context Management provider.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host claude-codex",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host claude-codex",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

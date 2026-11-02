@@ -19,6 +19,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 PROVIDER = ROOT / "hooks" / "context_provider.py"
 CLAUDE_CODEX = ROOT / "hooks" / "claude-codex-hooks.json"
+CLAUDE_FAILURE_GUARD = ROOT / "hooks" / "claude-failure-guard-hooks.json"
 ANTIGRAVITY = ROOT / "hooks" / "antigravity-hooks.json"
 OPENCODE = {1: ROOT / "hooks" / "opencode" / "v1.ts", 2: ROOT / "hooks" / "opencode" / "v2.ts"}
 
@@ -177,7 +178,7 @@ def _strip_event_hooks(config: dict[str, Any], host: str) -> tuple[dict[str, Any
     return updated, removed
 
 
-def _event_template() -> dict[str, list[Any]]:
+def _event_template(with_failure_guard: bool = False) -> dict[str, list[Any]]:
     template = _load_template(CLAUDE_CODEX)
     hooks = copy.deepcopy(template.get("hooks"))
     if not isinstance(hooks, dict):
@@ -192,14 +193,59 @@ def _event_template() -> dict[str, list[Any]]:
                     replaced += 1
     if not replaced:
         raise HookError("Claude/Codex template has no managed command")
+    if with_failure_guard:
+        guard = _load_template(CLAUDE_FAILURE_GUARD).get("hooks")
+        if not isinstance(guard, dict):
+            raise HookError("Claude failure guard template has no hooks")
+        for event, groups in guard.items():
+            if event not in ("PostToolUse", "PostToolUseFailure") or not isinstance(groups, list):
+                raise HookError("invalid Claude failure guard template")
+            for group in groups:
+                for handler in group.get("hooks", []):
+                    if not _is_managed(handler, "claude-codex"):
+                        raise HookError("unexpected failure guard handler")
+                    handler["command"] = command
+            hooks.setdefault(event, []).extend(copy.deepcopy(groups))
     return hooks
 
 
-def _event_install(target: Path) -> int:
+def _strip_old_experience_hooks(config: dict[str, Any]) -> dict[str, Any]:
+    """Prune the superseded experience_provider hook, never unrelated handlers."""
+    hooks = config.get("hooks")
+    if not isinstance(hooks, dict):
+        return config
+    for event in list(hooks):
+        kept = []
+        for group in hooks[event]:
+            if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+                kept.append(group)
+                continue
+            remaining = []
+            for handler in group["hooks"]:
+                command = handler.get("command", "") if isinstance(handler, dict) else ""
+                if not (isinstance(command, str) and
+                        "skills/experiences/hooks/experience_provider.py" in
+                        command.replace("\\", "/")):
+                    remaining.append(handler)
+            if remaining:
+                item = copy.deepcopy(group)
+                item["hooks"] = remaining
+                kept.append(item)
+        if kept:
+            hooks[event] = kept
+        else:
+            del hooks[event]
+    if not hooks:
+        config.pop("hooks", None)
+    return config
+
+
+def _event_install(target: Path, with_failure_guard: bool = False) -> int:
     try:
         current = _load_json(target)
         updated, removed = _strip_event_hooks(current, "claude-codex")
-        desired = _event_template()
+        updated = _strip_old_experience_hooks(updated)
+        desired = _event_template(with_failure_guard)
         hooks = updated.setdefault("hooks", {})
         if not isinstance(hooks, dict):
             raise HookError("existing 'hooks' field must be an object")
@@ -508,9 +554,12 @@ def _interactive() -> tuple[str, str, str, int | None]:
     return provider, operation, scope, major
 
 
-def _run(provider: str, operation: str, target: Path, major: int | None = None) -> int:
+def _run(provider: str, operation: str, target: Path, major: int | None = None,
+         with_failure_guard: bool = False) -> int:
     if provider in ("codex", "claude"):
-        return {"install": _event_install, "status": _event_status, "remove": _event_remove}[operation](target)
+        if operation == "install":
+            return _event_install(target, with_failure_guard)
+        return {"status": _event_status, "remove": _event_remove}[operation](target)
     if provider == "antigravity":
         return _antigravity_run(operation, target)
     return _opencode_run(operation, target, major)
@@ -535,7 +584,11 @@ def main() -> int:
     parser.add_argument("--project-root")
     parser.add_argument("--codex-home")
     parser.add_argument("--opencode-major", type=int, choices=(1, 2))
+    parser.add_argument("--with-failure-guard", action="store_true",
+                        help="opt in to Claude Bash post-tool loop detection")
     args = parser.parse_args()
+    if args.with_failure_guard and (args.provider != "claude" or args.operation != "install"):
+        parser.error("--with-failure-guard only supports 'claude install'")
 
     scope = _scope(args.scope)
     if args.codex_home and (args.provider != "codex" or scope == "project"):
@@ -546,7 +599,8 @@ def main() -> int:
         project_root=args.project_root,
         codex_home=args.codex_home,
     )
-    return _run(args.provider, args.operation, target, args.opencode_major)
+    return _run(args.provider, args.operation, target, args.opencode_major,
+                with_failure_guard=args.with_failure_guard)
 
 
 if __name__ == "__main__":

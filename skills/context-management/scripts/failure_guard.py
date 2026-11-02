@@ -22,7 +22,7 @@ HINT = (
     "Potential failure loop: the same error signature appeared 3 times without "
     "observed progress. Stop repeating the approach. Inspect the owning source, "
     "compare the last attempts, and look up a relevant lesson with "
-    "'python3 skills/experiences/scripts/experience_ops.py list --query <error>'. "
+    "'python3 skills/context-management/scripts/experience_ops.py list --query <error>'. "
     "Experiences are advisory; verify against current source and tests."
 )
 

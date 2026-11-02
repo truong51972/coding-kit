@@ -21,6 +21,7 @@ def _run(
     codex_home: Path | None = None,
     project_root: Path | None = None,
     opencode_major: int | None = None,
+    with_failure_guard: bool = False,
     stdin: str | None = None,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
@@ -35,6 +36,8 @@ def _run(
             command += ["--project-root", str(project_root)]
         if opencode_major is not None:
             command += ["--opencode-major", str(opencode_major)]
+        if with_failure_guard:
+            command += ["--with-failure-guard"]
     return subprocess.run(
         command,
         cwd=cwd,
@@ -212,7 +215,8 @@ def test_tui_orders_scope_then_detected_provider_then_action(tmp_path: Path) -> 
     assert result.returncode == 0, result.stderr
     assert result.stdout.index("1) Scope") < result.stdout.index("2) Provider")
     assert result.stdout.index("2) Provider") < result.stdout.index("3) Action")
-    assert "Codex  ✓ detected / recommended" in result.stdout
+    assert any("Codex" in row and "detected" in row and "recommended" in row
+               for row in result.stdout.splitlines())
     assert (repo / ".codex" / "hooks.json").exists()
 
 
@@ -254,3 +258,38 @@ def test_opencode_remove_refuses_modified_plugin(tmp_path: Path) -> None:
 
     assert result.returncode == 2
     assert target.exists()
+
+
+
+def test_claude_failure_guard_opt_in_and_legacy_hook_cleanup(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    _init_git_repo(repo)
+    target = repo / ".claude" / "settings.json"
+    target.parent.mkdir(parents=True)
+    legacy = {
+        "hooks": {
+            "SessionStart": [{"hooks": [
+                {"type": "command", "command":
+                 "python3 /tmp/skills/experiences/hooks/experience_provider.py"}]}],
+            "PostToolUse": [{"hooks": [
+                {"type": "command", "command":
+                 "python3 /tmp/skills/experiences/hooks/experience_provider.py"},
+                {"type": "command", "command": "echo unrelated"}]}],
+        },
+        "other": "preserve",
+    }
+    target.write_text(json.dumps(legacy))
+    result = _run("claude", "install", cwd=repo, with_failure_guard=True)
+    assert result.returncode == 0, result.stderr
+    data = json.loads(target.read_text())
+    assert data["other"] == "preserve"
+    assert {"SessionStart", "SubagentStart", "PostToolUse",
+            "PostToolUseFailure"}.issubset(data["hooks"])
+    assert "experience_provider.py" not in target.read_text()
+    assert "echo unrelated" in target.read_text()
+    assert _run("claude", "install", cwd=repo).returncode == 0
+    data = json.loads(target.read_text())
+    assert "PostToolUseFailure" not in data["hooks"]
+    assert "echo unrelated" in target.read_text()
+    assert _run("claude", "status", cwd=repo).returncode == 0
+    assert _run("codex", "install", cwd=repo, with_failure_guard=True).returncode != 0
