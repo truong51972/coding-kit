@@ -58,7 +58,7 @@ def _parse(content: str) -> list[dict[str, str | int]]:
     for i, match in enumerate(matches):
         entry = content[match.end():matches[i + 1].start() if i + 1 < len(matches) else len(content)]
         details: dict[str, str] = {}
-        for line in entry.strip().splitlines():
+        for line in entry.strip("\n").splitlines():
             if not line.strip():
                 continue
             meta = re.fullmatch(r"  - ([A-Za-z ]+): (.+)", line)
