@@ -3,8 +3,9 @@
 Hooks are an optional runtime adapter for Context Management. They reduce the
 chance that an agent forgets startup context, loses routing after compaction, or
 starts a subagent without the repository context contract. REFLECT is a separate
-agent reasoning procedure: see [reflect.md](reflect.md). No shipped host adapter
-currently guarantees post-turn semantic reflection or persistence.
+agent reasoning procedure: see [reflect.md](reflect.md). The Codex/Claude adapters now offer **opt-in**, once-per-turn Stop reflection
+continuation after observed write tools. This remains a semantic *request* to
+the agent, not proof that SYNC, CAPTURE, or TRACK_ASSUMPTION occurred.
 
 Hooks do **not** replace the lifecycle in `SKILL.md`:
 
@@ -237,16 +238,52 @@ continuity reminder, then normal zero-injection operation resumes.
 V1 and V2 plugin implementations are not interchangeable. Re-check the upstream
 plugin contract when upgrading across those major APIs.
 
-## Reflection hook readiness (not yet installed)
+## Proactive REFLECT adapters
 
-For now REFLECT runs through the agent's task/completion contract. The optional
-existing hooks only restore routing and continuity. Do not add an untested
-`Stop` or `PreCompact` continuation handler to the shared installer, or
-equate `hook_ops status` with confirmed runtime execution. A later adapter
-requires an observed execution trace, host-specific input/output schema, a
-read-only/no-change fast path and a bounded stop-loop guard. Where the host
-supports only compaction-summary customization, preserve *pointers to pending
-candidates* rather than claiming a durable SYNC took place. Execution
+The standard installer remains a low-overhead continuity-only setup. Opt in to
+`Stop` reflection for Claude Code or Codex after confirming the host accepts
+the documented events:
+
+```sh
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py \
+  codex install --with-reflect
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py \
+  claude install --with-reflect
+# Claude Code can combine --with-reflect and --with-failure-guard
+```
+
+These adapters register `UserPromptSubmit` (reset per-turn state),
+`PostToolUse` for named write/edit tools, and `Stop`. Claude also gets
+`PreCompact` **summary guidance only**. They store only a hashed
+session/workspace key and pending/consumed flags in user-local state under
+`$XDG_STATE_HOME/coding-kit/reflection-guard/`; they never store tool
+payloads, scrape transcripts, or write repository memory themselves.
+
+The first Stop with a pending write signal requests **one** bounded REFLECT
+continuation, then consumes the signal before responding. Repeated Stop calls
+and `stop_hook_active=true` are silent. Next user turn resets the flag.
+Memory-only writes and read-only tool use do not trigger continuation. Signals
+are deliberately conservative: a shell script that edits files or a purely
+conversational architecture decision may have no observed write event, so
+agent-level REFLECT in `SKILL.md` is still required.
+
+Claude's pre-compaction adapter emits summary instructions for pending
+knowledge candidate pointers; Codex PreCompact is intentionally not used as
+a persistence opportunity. No host hook guarantees reflection after a crash,
+interrupt, permission rejection, or unobserved external write. Keep hooks
+opt-in until exercised against the installed host version.
+
+`status` reports registration, **not** proof of observed execution. Run
+`remove` to remove managed hooks while preserving unrelated handlers.
+A subsequent `install` without `--with-reflect` removes the optional
+reflection handlers.
+
+OpenCode V1/V2 use their existing plugins. Both adapters now inject a small
+REFLECT reminder into the **next available model context** after an observed
+successful write/edit tool call; this does not create a new model turn at idle.
+Compaction preserves pending candidate pointers. OpenCode V1 and V2 plugin
+APIs differ; match the installed major version and verify locally. No generic
+T3-specific completion hook contract has been established. Execution
 checkpoints and retries remain the host/project's responsibility.
 
 ## Overhead budget
