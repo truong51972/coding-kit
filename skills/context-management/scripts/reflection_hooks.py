@@ -110,7 +110,10 @@ def handle(root: Path, payload: dict[str, Any], host: str) -> dict[str, Any] | s
         # It must NOT reset the guard; otherwise reflection writes could trigger
         # a second continuation in the same logical turn.
         prompt = payload.get("prompt")
-        if isinstance(prompt, str) and prompt.strip() == REASON:
+        if isinstance(prompt, str) and REASON[:55] in prompt:
+            if current.get("requested"):
+                _save(path, {"pending": False, "requested": True,
+                             "turn": turn or current.get("turn")})
             return None
         # A genuinely new prompt opens a new opportunity. No prompt body is
         # persisted: state contains only turn IDs and Boolean flags.
