@@ -89,9 +89,10 @@ writes or material uncertainties. Static lint is never semantic proof.
 
 ## Host hooks
 
-Existing bootstrap/compaction hooks only restore context routing. They are
-not a guarantee that REFLECT ran. A future opt-in stop/idle adapter must be
-host-specific, bounded, demonstrably compatible, and skip read-only/no-change
-turns without forcing another agent turn. A pre-compaction summary can preserve
-pending candidate pointers, but must not pretend that those candidates were
-persisted. See [hooks.md](hooks.md).
+Bootstrap/compaction hooks restore routing. Optional Codex/Claude Stop
+adapters can request **one** REFLECT continuation when a write/edit tool was
+observed, and OpenCode V1/V2 can insert a reminder into the next model
+context after such a tool call. These are **eligibility signals** only;
+neither guarantees a durable write, captures purely conversational decisions,
+or reads the transcript for heuristic mining. Pre-compaction guidance preserves
+pending candidate pointers, not persisted knowledge. See [hooks.md](hooks.md).
