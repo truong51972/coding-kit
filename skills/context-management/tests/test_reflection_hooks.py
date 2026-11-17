@@ -47,7 +47,9 @@ def test_stop_is_once_per_substantive_write_turn(tmp_path: Path) -> None:
     assert _event(root, home, "claude", "Stop") is None
     assert _event(root, home, "claude", "Stop", stop_hook_active=True) is None
     # New user turn gets its own single bounded opportunity.
-    assert _event(root, home, "claude", "UserPromptSubmit") is None
+    reminder = _event(root, home, "claude", "UserPromptSubmit")
+    assert reminder["hookSpecificOutput"]["hookEventName"] == "UserPromptSubmit"
+    assert "read-only" in reminder["hookSpecificOutput"]["additionalContext"]
     assert _event(root, home, "claude", "PostToolUse", tool_name="Write",
                   tool_input={"file_path": "src/new.py"}) is None
     assert _event(root, home, "claude", "Stop")["decision"] == "block"
