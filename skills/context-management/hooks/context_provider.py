@@ -47,9 +47,14 @@ def _contains_managed_block(path: Path) -> bool:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return False
-    start = text.find(MANAGED_BLOCK_START)
-    end = text.find(MANAGED_BLOCK_END)
-    return start >= 0 and end > start
+    # A partial/duplicated registration must not activate the skill. The
+    # deterministic context validator requires exactly one ordered marker pair;
+    # keep the lightweight hook probe consistent with that contract.
+    if text.count(MANAGED_BLOCK_START) != 1 or text.count(MANAGED_BLOCK_END) != 1:
+        return False
+    start = text.index(MANAGED_BLOCK_START) + len(MANAGED_BLOCK_START)
+    end = text.index(MANAGED_BLOCK_END)
+    return end >= start
 
 
 def _managed_root(starts: list[str]) -> Path | None:
