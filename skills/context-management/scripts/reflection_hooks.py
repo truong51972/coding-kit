@@ -143,10 +143,18 @@ def handle(root: Path, payload: dict[str, Any], host: str) -> dict[str, Any] | s
             if not isinstance(paths, list):
                 return None
             touched = [p for p in paths if isinstance(p, str)]
-            if not touched or all(_memory_only({"path": p}) for p in touched):
+            if not touched:
+                return None
+            if all(_memory_only({"path": p}) for p in touched):
+                if current.get("pending"):
+                    _save(path, {"pending": False, "requested": True,
+                                 "turn": turn or current.get("turn")})
                 return None
         elif tool in WRITE_TOOLS:
             if _memory_only(payload.get("tool_input")):
+                if current.get("pending"):
+                    _save(path, {"pending": False, "requested": True,
+                                 "turn": turn or current.get("turn")})
                 return None
         else:
             return None
