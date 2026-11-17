@@ -118,6 +118,17 @@ def _claude_codex(payload: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _reflect(payload: dict[str, Any], host: str) -> dict[str, Any] | str | None:
+    """Opt-in event bridge. Semantic memory writes remain agent-owned."""
+    root = _managed_root(_starts_for(payload))
+    if root is None:
+        return None
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from reflection_hooks import handle
+
+    return handle(root, payload, host)
+
+
 def _antigravity(payload: dict[str, Any]) -> dict[str, Any]:
     # Antigravity has no SessionStart/compact event. PreInvocation is therefore used
     # only for invocation 0; later invocations remain a no-op despite the host calling
@@ -131,7 +142,11 @@ def _antigravity(payload: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", choices=("claude-codex", "antigravity"), required=True)
+    parser.add_argument(
+        "--host",
+        choices=("claude-codex", "antigravity", "claude-reflect", "codex-reflect"),
+        required=True,
+    )
     args = parser.parse_args()
 
     try:
@@ -142,13 +157,17 @@ def main() -> int:
     if not isinstance(payload, dict):
         return 0
 
-    output: dict[str, Any] | None
+    output: dict[str, Any] | str | None
     if args.host == "claude-codex":
         output = _claude_codex(payload)
-    else:
+    elif args.host == "antigravity":
         output = _antigravity(payload)
+    else:
+        output = _reflect(payload, args.host.split("-")[0])
 
-    if output is not None:
+    if isinstance(output, str):
+        sys.stdout.write(output)
+    elif output is not None:
         sys.stdout.write(json.dumps(output, separators=(",", ":")))
     return 0
 
