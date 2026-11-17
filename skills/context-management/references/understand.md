@@ -69,11 +69,29 @@ trivial tasks that do not need repository knowledge.
 10. Keep a note for the later sync phase when a durable context fact appears
     drifted.
 
+## Stop condition
+
+Stop context loading once **task scope, relevant constraints, and the owning
+source(s) that need verification** are identified. Each additional context
+shard must answer a specific unresolved question, not satisfy a ritual read
+quota. A complete managed block already supplied in the active prompt may
+serve as the routing entry point if its provenance and completeness are clear;
+an injected reminder is never a substitute for the block itself.
+
+An indexed shard may link to a project-delegated register, dataset policy,
+task artifact or assumption ledger. Follow that link when relevant without
+reclassifying its contents as an experience or durable context. Inspect
+decision-relevant provisional assumptions only when they affect the task;
+their presence does not grant them factual authority. See
+[assumptions.md](assumptions.md).
+
 ## Selection Heuristics
 
 - Load `source-priority.md` for source ownership, read order, file roles, source-of-truth conflicts, or drift repair.
 - Load `project-baseline.md` for product, domain, architecture, document narrative, scope, or audience questions.
-- Load `active-assumptions.md` when decisions depend on constraints, defaults, limits, or unresolved operating assumptions.
+- Load `active-assumptions.md` when decisions depend on constraints, defaults,
+  limits, or **accepted durable** operating assumptions. Provisional assumptions
+  remain with the task or a separately designated ledger.
 - Load optional context shards only when the managed Context Index routes to
   their file or containing folder. A folder listing is discovery metadata, not
   permission to load its contents. Retrieve experiences separately through the
