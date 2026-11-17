@@ -55,7 +55,9 @@ verify evidence and choose **NO_CHANGE**, scoped **SYNC**, verified experience
 requests. Capture only consequential, unresolved assumptions; use the task
 artifact by default and an optional project ledger only for cross-task reuse.
 Read [assumptions.md](references/assumptions.md) when candidates qualify.
-Repeated assumptions never become facts solely by frequency. Never turn
+Use the optional `assumption_ops.py` helper only when a project explicitly
+wants a shared ledger; it is never created implicitly. Repeated assumptions
+never become facts solely by frequency. Never turn
 execution tracking, retries or checkpointing into this skill's responsibility.
 
 ## Optional host hooks
@@ -64,9 +66,9 @@ Host lifecycle hooks may re-surface Context Management routing at session start,
 subagent start, and compaction boundaries. They are context providers/injectors,
 not a second lifecycle engine: a hook firing does not mean `understand`, semantic
 audit, REFLECT, `sync`, or maintenance has run, and existing hooks must not
-mutate durable context. Optional future REFLECT adapters require separately
-verified host lifecycle contracts, bounded execution and read-only/no-change
-guards; neither `Stop` nor pre-compaction implies persistence happened.
+mutate durable context. Opt-in REFLECT hooks are available for Claude Code/Codex and in-context
+reminders for OpenCode. They require host-specific validation and bounded
+execution; neither `Stop` nor pre-compaction implies persistence happened.
 
 Keep hook output small and pointer-oriented. Re-read the managed registration
 block and lazy-load only the shard needed next rather than injecting full shards.
@@ -176,6 +178,19 @@ size, duplication, and identifier density do not establish semantic alignment.
 Drift checks are shard-local so a recently edited shard cannot hide an older
 stale shard. All JSON output must retain
 `semantic_source_verification.status: not_performed`.
+
+## Optional assumption and REFLECT helpers
+
+```bash
+python3 /path/to/context-management/scripts/assumption_ops.py --repo . init
+python3 /path/to/context-management/scripts/assumption_ops.py --repo . lint
+python3 /path/to/context-management/scripts/hook_ops.py codex install --with-reflect
+python3 /path/to/context-management/scripts/hook_ops.py claude install --with-reflect
+```
+
+The assumption ledger is **opt-in**, not part of `context_ops.py init`.
+The REFLECT host hooks are also opt-in for Claude/Codex. Hook registration
+does not prove the runtime executed them; see [hooks.md](references/hooks.md).
 
 ## Experience CLI
 
