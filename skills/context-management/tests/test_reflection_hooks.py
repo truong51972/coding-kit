@@ -152,3 +152,16 @@ def test_claude_shell_requires_observed_changed_files(tmp_path: Path) -> None:
            tool_input={"command": "python update.py"},
            tool_response={"bashEditDiff": {"changedFiles": ["src/main.py"]}})
     assert _event(root, home, "claude", "Stop")["decision"] == "block"
+
+
+def test_already_synced_memory_suppresses_redundant_stop(tmp_path: Path) -> None:
+    root, home = _repo(tmp_path), tmp_path / "state"
+    _event(root, home, "claude", "PostToolUse", tool_name="Edit",
+           tool_input={"file_path": "src/main.py"})
+    _event(root, home, "claude", "PostToolUse", tool_name="Write",
+           tool_input={"file_path": ".agents/contexts/project-baseline.md"})
+    assert _event(root, home, "claude", "Stop") is None
+    _event(root, home, "claude", "UserPromptSubmit", prompt="Continue feature work")
+    _event(root, home, "claude", "PostToolUse", tool_name="Edit",
+           tool_input={"file_path": "src/other.py"})
+    assert _event(root, home, "claude", "Stop")["decision"] == "block"
