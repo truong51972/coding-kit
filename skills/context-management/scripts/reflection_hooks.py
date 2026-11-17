@@ -73,7 +73,7 @@ def _memory_only(tool_input: Any) -> bool:
         tool_input.get("file_path"), tool_input.get("path"),
         tool_input.get("notebook_path"),
     ]
-    patch = tool_input.get("patch") or tool_input.get("patch_text")
+    patch = tool_input.get("patch") or tool_input.get("patch_text") or tool_input.get("patchText")
     if isinstance(patch, str):
         targets += re.findall(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", patch, re.M)
     paths = [str(x).replace("\\", "/").lstrip("./") for x in targets if isinstance(x, str)]
@@ -89,7 +89,7 @@ def _memory_only(tool_input: Any) -> bool:
 def handle(root: Path, payload: dict[str, Any], host: str) -> dict[str, Any] | str | None:
     """Handle PostToolUse, Stop and PreCompact. Return output or None (silent)."""
     event = payload.get("hook_event_name")
-    if event not in {"PostToolUse", "Stop", "PreCompact"}:
+    if event not in {"PostToolUse", "Stop", "PreCompact", "UserPromptSubmit"}:
         return None
 
     path = _state_path(root, payload, host)
@@ -98,6 +98,12 @@ def handle(root: Path, payload: dict[str, Any], host: str) -> dict[str, Any] | s
     current = _read(path)
     turn = payload.get("turn_id")
     turn = turn if isinstance(turn, str) and len(turn) < 256 else None
+
+    if event == "UserPromptSubmit":
+        # A new user turn resets the once-per-turn continuation guard even on
+        # hosts that do not expose a turn_id (Claude Code).
+        _save(path, {"pending": False, "requested": False, "turn": turn})
+        return None
 
     if event == "PostToolUse":
         tool = payload.get("tool_name")
