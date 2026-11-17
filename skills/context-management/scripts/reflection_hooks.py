@@ -106,8 +106,14 @@ def handle(root: Path, payload: dict[str, Any], host: str) -> dict[str, Any] | s
     turn = turn if isinstance(turn, str) and len(turn) < 256 else None
 
     if event == "UserPromptSubmit":
-        # A new user turn resets the once-per-turn continuation guard even on
-        # hosts that do not expose a turn_id (Claude Code).
+        # Codex presents a Stop-hook continuation as a new user-style prompt.
+        # It must NOT reset the guard; otherwise reflection writes could trigger
+        # a second continuation in the same logical turn.
+        prompt = payload.get("prompt")
+        if isinstance(prompt, str) and prompt.strip() == REASON:
+            return None
+        # A genuinely new prompt opens a new opportunity. No prompt body is
+        # persisted: state contains only turn IDs and Boolean flags.
         _save(path, {"pending": False, "requested": False, "turn": turn})
         return {
             "hookSpecificOutput": {
