@@ -42,7 +42,11 @@ async function hasManagedContext(root: string): Promise<boolean> {
     if (starts !== 1 || ends !== 1) return false
     const start = text.indexOf(MANAGED_BLOCK_START) + MANAGED_BLOCK_START.length
     const end = text.indexOf(MANAGED_BLOCK_END)
-    return end >= start
+    if (end < start) return false
+    const block = text.slice(start, end)
+    const lines = new Set(block.split("\n").map(line => line.trim()))
+    return ["## Context Management", "### Startup", "### Context Index",
+      "### Project Working Conventions"].every(heading => lines.has(heading))
   } catch {
     return false
   }
