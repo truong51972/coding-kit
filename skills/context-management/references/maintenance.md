@@ -25,6 +25,14 @@ Use maintenance when:
 - Keep the marker-managed block as the compact entry point and Context Index.
 - Run lint, validate, and static audit after mutations.
 
+## Assumption review is scoped
+
+When an owning source changes, review only assumptions whose documented scope
+or verification source is affected. Retire or resolve stale assumptions in
+their designated task/ledger owner, not by bulk-copying them into durable
+contexts. Unresolved operational holds are not assumptions and must remain in
+their project-owned register. Do not sweep all assumptions on every task.
+
 ## Experience maintenance is separate
 
 For obsolete, duplicate, or no-longer-applicable lessons, use the experience
