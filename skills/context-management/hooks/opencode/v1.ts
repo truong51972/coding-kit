@@ -6,7 +6,7 @@ const MANAGED_BLOCK_START = "<!-- context-management:start -->"
 const MANAGED_BLOCK_END = "<!-- context-management:end -->"
 
 const BOOTSTRAP_CONTEXT =
-  "Context Management is active in this repository. Read only the marker-managed Context Management block in AGENTS.md before non-trivial work. Use its Context Index to lazy-load only the shard needed next; verify decisions against owning source, which is authoritative. Hooks only restore routing/continuity; semantic audit, sync, and maintenance remain context-management skill behavior."
+  "Context Management is active in this repository. Read only the marker-managed Context Management block in AGENTS.md before non-trivial work. Use its Context Index to lazy-load only the shard needed next; verify decisions against owning source, which is authoritative. Hooks only restore routing/continuity; semantic audit, sync, and maintenance remain context-management skill behavior. At substantive completion perform bounded REFLECT; NO_CHANGE requires no persistence."
 
 const COMPACT_CONTEXT =
   "Context Management continuity after compaction. Re-read the marker-managed block in AGENTS.md, then reload only the shard directly needed for the active task; do not bulk-load context. Treat owning source as authoritative and continue the existing task from the compacted summary. Audit, sync, and maintenance behavior remains unchanged and is not performed by this hook."
@@ -20,14 +20,19 @@ function isKnowledgeWrite(args: unknown): boolean {
   if (!args || typeof args !== "object") return false
   const record = args as Record<string, unknown>
   const target = record.filePath ?? record.file_path ?? record.path ?? record.notebook_path
-  if (typeof target !== "string") return false
-  const path = target.replaceAll("\\", "/")
-  return ["/.agents/contexts/", "/.agents/experiences/", "/.agents/assumptions/"].some(x => path.includes(x)) ||
-    [".agents/contexts/", ".agents/experiences/", ".agents/assumptions/"].some(x => path.startsWith(x))
+  const patch = record.patch ?? record.patchText ?? record.patch_text
+  const paths = typeof target === "string" ? [target] :
+    typeof patch === "string" ? Array.from(patch.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm), m => m[1]) : []
+  if (!paths.length) return false
+  return paths.every(target => {
+    const path = target.replaceAll("\\", "/")
+    return ["/.agents/contexts/", "/.agents/experiences/", "/.agents/assumptions/"].some(x => path.includes(x)) ||
+      [".agents/contexts/", ".agents/experiences/", ".agents/assumptions/"].some(x => path.startsWith(x))
+  })
 }
 
 const COMPACTION_PROMPT =
-  "When writing this checkpoint, preserve the current objective, decisions, blockers, next move, and the names or purpose of any .agents/contexts shards that materially affect the task. Do not copy whole context shards into the summary. Preserve source-versus-context conflicts as unresolved until verified; owning source remains authoritative."
+  "When writing the compact summary, preserve the current objective, decisions, blockers, next move, and the names or purpose of any .agents/contexts shards that materially affect the task. Do not copy whole context shards into the summary. Preserve source-versus-context conflicts as unresolved until verified; owning source remains authoritative."
 
 async function hasManagedContext(root: string): Promise<boolean> {
   try {
