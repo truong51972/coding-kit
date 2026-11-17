@@ -2,7 +2,7 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit|apply_patch",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|apply_patch|Bash|PowerShell",
         "hooks": [
           {
             "type": "command",
