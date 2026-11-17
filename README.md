@@ -41,7 +41,7 @@ npx skills add truong51972/coding-kit --skill '*' -a codex -g -y
 | Skill | Use it for |
 | --- | --- |
 | [`celery-worker`](skills/celery-worker/SKILL.md) | Celery task boundaries, acknowledgements, retries, broker routing, Django producers, worker lifecycle, and integration tests. |
-| [`context-management`](skills/context-management/SKILL.md) | Lazy-loaded repository context, verified historical experiences, semantic audit, sync, maintenance, and optional continuity/failure-guard hooks. |
+| [`context-management`](skills/context-management/SKILL.md) | Lazy-loaded repository context, proactive REFLECT, decision-relevant assumptions, verified experiences, Smart SYNC, and optional continuity/failure-guard hooks. |
 | [`dependency-injection`](skills/dependency-injection/SKILL.md) | Python DI and resource lifecycle across FastAPI, Celery, CLI entry points, and test overrides. |
 | [`drf-api-architecture`](skills/drf-api-architecture/SKILL.md) | Django REST Framework API boundaries, serializers, scoped object access, workflows, asynchronous job endpoints, and contracts. |
 | [`python-monorepo-architecture`](skills/python-monorepo-architecture/SKILL.md) | Python app/package boundaries, `uv` dependency management, Dockerfiles, Compose, and monorepo layouts. |
@@ -68,7 +68,7 @@ Use `npx skills update` for the interactive project/global update flow, or `npx 
 
 ## Optional integrations
 
-**Context Management** is a repo-level workflow, not an automatically populated memory database. Its activation uses a managed marker/Context Index in the target repository's `AGENTS.md`, with lazy-loaded current-state shards in `.agents/contexts/`. Follow [`init.md`](skills/context-management/references/init.md) for first-time setup. Optional host hooks re-surface routing after startup, subagent creation, or compaction; see the [hook setup guide](skills/context-management/references/hooks.md).
+**Context Management** is a repo-level knowledge workflow, not an automatically populated memory database. Its REFLECT procedure proactively evaluates meaningful knowledge deltas (including consequential unverified assumptions) and chooses NO_CHANGE, SYNC or verified experience capture. REFLECT is an agent procedure, not a guaranteed background hook or an execution checkpoint. Its activation uses a managed marker/Context Index in the target repository's `AGENTS.md`, with lazy-loaded current-state shards in `.agents/contexts/`. Follow [`init.md`](skills/context-management/references/init.md) for first-time setup. Optional host hooks re-surface routing after startup, subagent creation, or compaction; see the [hook setup guide](skills/context-management/references/hooks.md).
 
 **Verified Experiences** are now managed by `context-management`, **not installed as a separate skill**. Historical lessons remain in the target repository's `.agents/experiences/` or optional personal `$AGENTS_HOME/experiences/` notebook. The standard-library `experience_ops.py` supports metadata-first lookup, capture, lint, and retirement:
 
