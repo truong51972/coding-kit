@@ -136,3 +136,19 @@ def test_codex_synthetic_continuation_does_not_rearm_guard(tmp_path: Path) -> No
     _event(root, home, "codex", "PostToolUse", turn_id="turn-3",
            tool_name="Edit", tool_input={"file_path": "src/new.py"})
     assert _event(root, home, "codex", "Stop", turn_id="turn-3")["decision"] == "block"
+
+
+def test_claude_shell_requires_observed_changed_files(tmp_path: Path) -> None:
+    root, home = _repo(tmp_path), tmp_path / "state"
+    _event(root, home, "claude", "PostToolUse", tool_name="Bash",
+           tool_input={"command": "python update.py"}, tool_response={"stdout": "done"})
+    assert _event(root, home, "claude", "Stop") is None
+    _event(root, home, "claude", "PostToolUse", tool_name="Bash",
+           tool_input={"command": "python update.py"},
+           tool_response={"bashEditDiff": {"changedFiles": [
+               ".agents/contexts/project-baseline.md"]}})
+    assert _event(root, home, "claude", "Stop") is None
+    _event(root, home, "claude", "PostToolUse", tool_name="Bash",
+           tool_input={"command": "python update.py"},
+           tool_response={"bashEditDiff": {"changedFiles": ["src/main.py"]}})
+    assert _event(root, home, "claude", "Stop")["decision"] == "block"
