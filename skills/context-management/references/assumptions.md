@@ -82,5 +82,35 @@ no default encounter threshold or promotion counter.
 - Do not claim exhaustive automatic contradiction detection: review is scoped
   to touched sources and decisions.
 
+## Optional ledger helper
+
+The standard-library `assumption_ops.py` supports an explicit project-local
+Markdown ledger without introducing a database. It does not run during
+`context_ops.py init` or install; the task owner can use an existing handoff
+artifact instead. A coordinator must own shared ledger writes.
+
+```sh
+python3 scripts/assumption_ops.py --repo . init
+python3 scripts/assumption_ops.py --repo . capture \
+  --claim "Worker replicas may be greater than one" \
+  --scope "production evaluation workers" \
+  --decision "retry and concurrency design" \
+  --basis "inferred from deployment config @ revision R" \
+  --verify-by "check active replica count in deployment source" \
+  --owner "coordinator"
+python3 scripts/assumption_ops.py --repo . list --query worker
+python3 scripts/assumption_ops.py --repo . show ASM-001
+python3 scripts/assumption_ops.py --repo . resolve ASM-001 \
+  --status verified --evidence "verified replicas in deployment source @ R"
+python3 scripts/assumption_ops.py --repo . lint
+```
+
+`--ledger <relative-path.md>` can select a project-designated location
+outside canonical Context/Experience storage. Capture is idempotent for
+matching scoped claims; resolve replaces the record and requires evidence
+for verified/rejected status. Resolved records are immutable. CLI lint checks
+structure, **not** whether evidence is true. It never promotes into durable
+context automatically; an authorized agent must perform scoped SYNC.
+
 No dedicated assumption database, vector index, automatic schema migration,
-or always-on scanner is required for the initial version.
+or always-on scanner is required for this version.
