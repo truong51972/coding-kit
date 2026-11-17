@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -54,7 +55,20 @@ def _contains_managed_block(path: Path) -> bool:
         return False
     start = text.index(MANAGED_BLOCK_START) + len(MANAGED_BLOCK_START)
     end = text.index(MANAGED_BLOCK_END)
-    return end >= start
+    if end < start:
+        return False
+    # Keep the activation probe compatible with context_ops.managed_block.
+    block = text[start:end]
+    headings = (
+        ("##", "Context Management"),
+        ("###", "Startup"),
+        ("###", "Context Index"),
+        ("###", "Project Working Conventions"),
+    )
+    return all(
+        re.search(rf"^{re.escape(level)}\s+{re.escape(title)}\s*$", block, re.MULTILINE)
+        for level, title in headings
+    )
 
 
 def _managed_root(starts: list[str]) -> Path | None:
