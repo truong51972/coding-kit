@@ -2,7 +2,9 @@
 
 Hooks are an optional runtime adapter for Context Management. They reduce the
 chance that an agent forgets startup context, loses routing after compaction, or
-starts a subagent without the repository context contract.
+starts a subagent without the repository context contract. REFLECT is a separate
+agent reasoning procedure: see [reflect.md](reflect.md). No shipped host adapter
+currently guarantees post-turn semantic reflection or persistence.
 
 Hooks do **not** replace the lifecycle in `SKILL.md`:
 
@@ -11,8 +13,11 @@ Hooks do **not** replace the lifecycle in `SKILL.md`:
 - semantic audit decides whether context and source still agree;
 - `sync` and maintenance decide whether durable context must change.
 
-A hook must never claim that audit or sync happened, and it must never mutate
-`.agents/contexts/` automatically.
+A hook must never claim that audit, REFLECT or sync happened, and current
+routing hooks must never mutate `.agents/contexts/` automatically. A future
+stop/idle hook must be opt-in, per-host tested, bounded against recursion and
+silent on read-only/no-change turns; pre-compaction is not guaranteed to allow
+normal tool-driven persistence.
 
 ## Delivery contract
 
@@ -231,6 +236,18 @@ continuity reminder, then normal zero-injection operation resumes.
 
 V1 and V2 plugin implementations are not interchangeable. Re-check the upstream
 plugin contract when upgrading across those major APIs.
+
+## Reflection hook readiness (not yet installed)
+
+For now REFLECT runs through the agent's task/completion contract. The optional
+existing hooks only restore routing and continuity. Do not add an untested
+`Stop` or `PreCompact` continuation handler to the shared installer, or
+equate `hook_ops status` with confirmed runtime execution. A later adapter
+requires an observed execution trace, host-specific input/output schema, a
+read-only/no-change fast path and a bounded stop-loop guard. Where the host
+supports only compaction-summary customization, preserve *pointers to pending
+candidates* rather than claiming a durable SYNC took place. Execution
+checkpoints and retries remain the host/project's responsibility.
 
 ## Overhead budget
 
