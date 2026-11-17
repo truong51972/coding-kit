@@ -23,6 +23,12 @@ REASON = (
     "CAPTURE, or TRACK_ASSUMPTION only when justified. NO_CHANGE is valid and "
     "must not create files. Do not repeat reflection after this continuation."
 )
+PROMPT_REMINDER = (
+    "Context Management: after substantive work, run a bounded REFLECT on "
+    "material current facts, verified lessons and decision-relevant unresolved "
+    "assumptions. NO_CHANGE is normal; do not write memory for read-only tasks "
+    "or promote an unsupported assumption."
+)
 COMPACT = (
     "Context Management: preserve concise pointers to unresolved, consequential "
     "assumptions and unprocessed knowledge candidates, with evidence and scope. "
@@ -103,7 +109,12 @@ def handle(root: Path, payload: dict[str, Any], host: str) -> dict[str, Any] | s
         # A new user turn resets the once-per-turn continuation guard even on
         # hosts that do not expose a turn_id (Claude Code).
         _save(path, {"pending": False, "requested": False, "turn": turn})
-        return None
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "UserPromptSubmit",
+                "additionalContext": PROMPT_REMINDER,
+            }
+        }
 
     if event == "PostToolUse":
         tool = payload.get("tool_name")
