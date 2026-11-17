@@ -19,7 +19,7 @@ def _events(path: Path, keyword: str) -> set[str]:
     config = json.loads(path.read_text(encoding="utf-8"))
     return {
         event
-        for event, groups in config["hooks"].items()
+        for event, groups in config.get("hooks", {}).items()
         if any(keyword in handler.get("command", "") for group in groups
                for handler in group.get("hooks", []))
     }
