@@ -50,7 +50,7 @@ class ReflectionActivationTests(unittest.TestCase):
         return json.loads(run.stdout) if run.stdout.strip() else None
 
     def test_exactly_one_ordered_marker_pair_activates(self) -> None:
-        self.marker(f"# Repo\n{START}\n## Context Management\n{END}\n")
+        self.marker(f"# Repo\n{START}\n## Context Management\n### Startup\n### Context Index\n### Project Working Conventions\n{END}\n")
         result = self.invoke("claude-codex")
         self.assertIn(
             "Context Management is active",
@@ -58,7 +58,7 @@ class ReflectionActivationTests(unittest.TestCase):
         )
 
     def test_duplicate_marker_pairs_do_not_activate_any_host(self) -> None:
-        self.marker(f"# Repo\n{START}\n## Context Management\n{END}\n"
+        self.marker(f"# Repo\n{START}\n## Context Management\n### Startup\n### Context Index\n### Project Working Conventions\n{END}\n"
                     f"{START}\n## Context Management\n{END}\n")
         self.assertIsNone(self.invoke("claude-codex"))
         self.assertEqual(self.invoke("antigravity"), {})
