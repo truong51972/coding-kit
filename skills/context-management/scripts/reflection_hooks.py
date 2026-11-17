@@ -127,11 +127,28 @@ def handle(root: Path, payload: dict[str, Any], host: str) -> dict[str, Any] | s
 
     if event == "PostToolUse":
         tool = payload.get("tool_name")
-        if tool not in WRITE_TOOLS or payload.get("permission_mode") == "plan":
+        if payload.get("permission_mode") == "plan":
             return None
         if payload.get("is_error") is True or payload.get("tool_error"):
             return None
-        if _memory_only(payload.get("tool_input")):
+        if tool in ("Bash", "PowerShell") and host == "claude":
+            # Claude 2.1.269+ may attach a best-effort changed-files diff.
+            # Ignore shell commands without observed changes; never infer writes
+            # by grepping command text (which could contain secrets).
+            response = payload.get("tool_response")
+            diff = response.get("bashEditDiff") if isinstance(response, dict) else None
+            if not isinstance(diff, dict):
+                return None
+            paths = diff.get("changedFiles")
+            if not isinstance(paths, list):
+                return None
+            touched = [p for p in paths if isinstance(p, str)]
+            if not touched or all(_memory_only({"path": p}) for p in touched):
+                return None
+        elif tool in WRITE_TOOLS:
+            if _memory_only(payload.get("tool_input")):
+                return None
+        else:
             return None
         # No transcript or tool payload is stored: only a turn-scoped dirty bit.
         # Never reset the processed marker after a stop-hook continuation.
