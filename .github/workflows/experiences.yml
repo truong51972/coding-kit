@@ -26,5 +26,9 @@ jobs:
         run: python -m pip install "pytest>=8,<10"
       - name: Compile scripts
         run: python -m compileall -q skills/context-management
+      - name: Parse OpenCode TypeScript hook adapters
+        run: |
+          npx --yes esbuild@0.25.12 skills/context-management/hooks/opencode/v1.ts --bundle --platform=node --external:@opencode-ai/plugin --outfile=/tmp/context-opencode-v1.js
+          npx --yes esbuild@0.25.12 skills/context-management/hooks/opencode/v2.ts --bundle --platform=node --external:@opencode/plugin --outfile=/tmp/context-opencode-v2.js
       - name: Run context and experience regression tests
         run: python -m pytest -q skills/context-management/tests
