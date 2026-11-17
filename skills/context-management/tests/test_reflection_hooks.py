@@ -113,3 +113,26 @@ def test_no_tool_payload_or_raw_transcript_saved(tmp_path: Path) -> None:
     assert "private API token" not in text
     assert "src/main.py" not in text
     assert json.loads(text)["pending"] is True
+
+
+def test_codex_synthetic_continuation_does_not_rearm_guard(tmp_path: Path) -> None:
+    root, home = _repo(tmp_path), tmp_path / "state"
+    _event(root, home, "codex", "UserPromptSubmit", turn_id="turn-1",
+           prompt="Implement worker changes")
+    _event(root, home, "codex", "PostToolUse", turn_id="turn-1",
+           tool_name="Edit", tool_input={"file_path": "src/worker.py"})
+    blocked = _event(root, home, "codex", "Stop", turn_id="turn-1")
+    assert blocked["decision"] == "block"
+    # Codex can surface the Stop reason as a synthetic prompt. It may carry
+    # another turn ID; it must not be treated as a new user request.
+    assert _event(root, home, "codex", "UserPromptSubmit", turn_id="turn-2",
+                  prompt=blocked["reason"]) is None
+    _event(root, home, "codex", "PostToolUse", turn_id="turn-2",
+           tool_name="Edit",
+           tool_input={"file_path": ".agents/contexts/project-baseline.md"})
+    assert _event(root, home, "codex", "Stop", turn_id="turn-2") is None
+    _event(root, home, "codex", "UserPromptSubmit", turn_id="turn-3",
+           prompt="Please implement another feature")
+    _event(root, home, "codex", "PostToolUse", turn_id="turn-3",
+           tool_name="Edit", tool_input={"file_path": "src/new.py"})
+    assert _event(root, home, "codex", "Stop", turn_id="turn-3")["decision"] == "block"
