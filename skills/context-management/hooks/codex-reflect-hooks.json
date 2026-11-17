@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host codex-reflect",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host codex-reflect",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}
