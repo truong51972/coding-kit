@@ -5,20 +5,24 @@ description: Manage durable repo context when AGENTS.md has the context-manageme
 
 # Context Management
 
-Manage two distinct forms of durable memory: current repository facts under
-`.agents/contexts/` and verified historical lessons under `.agents/experiences/`
-(or optional personal `$AGENTS_HOME/experiences/`). Load only what the task needs.
+Manage current repository knowledge under `.agents/contexts/`, verified historical
+lessons in the `.agents/experiences/` catalog (or optional personal notebook),
+and decision-relevant unresolved assumptions under the smallest appropriate
+task/project owner. Load only what the task needs.
 
 ## Activation and ownership
 
 Apply this skill implicitly for non-trivial repository work when `AGENTS.md`
 contains one valid `context-management` managed marker pair.
 
-Own `.agents/contexts/**`, `.agents/experiences/**`, and only the small
-marker-managed registration block in `AGENTS.md`. Keep that block limited to
-activation and the **Context Index** (individual context shards or folders). Experience files
-are discovered by the separate catalog, never duplicated in that index.
-Never analyze or modify the rest of `AGENTS.md`.
+Own `.agents/contexts/**`, verified experience **catalog entries** and only the
+small marker-managed registration block in `AGENTS.md`. Keep that block limited
+to activation and the **Context Index** (individual context shards or folders).
+Experience lessons are discovered by the separate catalog, never duplicated in
+that index. Project-delegated resources (registers, datasets, operational holds,
+run artifacts) retain their own ownership and policy, even when stored under a
+historically named `.agents/experiences/` subdirectory. Never analyze or modify
+the rest of `AGENTS.md`.
 
 Let source code, schemas, configuration, tests, and canonical documentation own
 their exact details. Treat source as authoritative whenever it conflicts with
@@ -40,12 +44,29 @@ what is true **now**; experiences describe what was learned **before**. Both are
 advisory compared with owning source/config/tests. Do not automatically write
 lessons from hooks; preserve separate review/retirement for experience records.
 
+## Proactive reflection (REFLECT)
+
+Run **REFLECT** proactively at meaningful decision/evidence boundaries and
+before completion of substantive repository work; users need not request a
+context update. Read [reflect.md](references/reflect.md) only when performing
+the procedure. Examine only new relevant candidates, classify ownership,
+verify evidence and choose **NO_CHANGE**, scoped **SYNC**, verified experience
+**CAPTURE**, or **TRACK_ASSUMPTION**. Do not write for review-only/read-only
+requests. Capture only consequential, unresolved assumptions; use the task
+artifact by default and an optional project ledger only for cross-task reuse.
+Read [assumptions.md](references/assumptions.md) when candidates qualify.
+Repeated assumptions never become facts solely by frequency. Never turn
+execution tracking, retries or checkpointing into this skill's responsibility.
+
 ## Optional host hooks
 
 Host lifecycle hooks may re-surface Context Management routing at session start,
 subagent start, and compaction boundaries. They are context providers/injectors,
 not a second lifecycle engine: a hook firing does not mean `understand`, semantic
-audit, `sync`, or maintenance has run, and hooks must not mutate durable context.
+audit, REFLECT, `sync`, or maintenance has run, and existing hooks must not
+mutate durable context. Optional future REFLECT adapters require separately
+verified host lifecycle contracts, bounded execution and read-only/no-change
+guards; neither `Stop` nor pre-compaction implies persistence happened.
 
 Keep hook output small and pointer-oriented. Re-read the managed registration
 block and lazy-load only the shard needed next rather than injecting full shards.
@@ -63,10 +84,15 @@ See [hooks.md](references/hooks.md) for host compatibility and opt-in setup.
 3. Run a scoped **SEMANTIC AUDIT** when context affects a decision, conflicts
    with source, references changed source roots, or the user requests review.
    Read [audit.md](references/audit.md).
-4. Run **SYNC** only when durable *current repository* knowledge changed. Read
+4. Run **REFLECT** proactively at meaningful decision, evidence or completion
+   boundaries to evaluate **new** knowledge and assumptions. NO_CHANGE is
+   normal; never trigger an extra turn solely to report it. See
+   [reflect.md](references/reflect.md).
+5. Run **SYNC** only when durable *current repository* knowledge changed, using
+   owner-first upsert rather than append-only history. Read
    [sync.md](references/sync.md). Separately capture a verified lesson only
-   when it passes the experience storage test in [experiences.md](references/experiences.md).
-5. Run **MAINTENANCE** only for broad cleanup, routing problems, duplicate or
+   when it passes [experiences.md](references/experiences.md).
+6. Run **MAINTENANCE** only for broad cleanup, routing problems, duplicate or
    oversized shards, large architecture changes, or explicit reset requests.
    Read [maintenance.md](references/maintenance.md).
 
@@ -79,7 +105,9 @@ Store a fact only when it is at least one of these:
 - An important invariant, boundary, convention, or active assumption.
 
 Do not store session summaries, task history, temporary TODOs, one-time test
-results, or narration of recent edits. For exact API, task, schema, migration,
+results, or narration of recent edits. Track decision-relevant provisional
+assumptions **outside** durable context until verified or explicitly adopted;
+never treat frequency as proof. For exact API, task, schema, migration,
 configuration, and implementation details, store a concise pointer to the
 owning source instead of copying the detail.
 
@@ -89,6 +117,12 @@ owning source instead of copying the detail.
   Index as the only routing source. Index entries may point to a single Markdown
   shard or a directory ending in `/`. For a matching directory, discover child
   paths by name and open only the relevant shard, never the whole directory.
+- The Context Index selects context shards; a relevant shard may link to a
+  project-delegated register, policy, or assumption ledger. Follow that explicit
+  link only when needed; do not treat it as a context shard or an experience.
+- Stop loading context when the task scope, material constraints and owning
+  sources to verify are identified. Each additional shard must answer a
+  concrete task question.
 - Treat hook-injected reminders as routing signals only; they do not count as a
   loaded shard or as source verification.
 - After compaction, re-establish the managed block and only the context directly
@@ -158,7 +192,10 @@ compatible post-tool hook. See [experiences.md](references/experiences.md).
 
 - Keep every shard directly linked or covered by an indexed folder, and
   lazy-loaded independently.
-- Resolve conflicts in favor of source and sync only durable deltas.
+- At meaningful completion, evaluate REFLECT once; preserve read-only intent.
+  NO_CHANGE requires no additional tool call or persistent entry.
+- Resolve conflicts in favor of source and sync only durable deltas, replacing
+  stale current-state projections rather than appending task history.
 - Run context `lint`/`validate` after context edits and review `audit` findings.
 - Run experience `lint` after lesson edits; never treat syntax checks as proof
   that evidence or the lesson's applicability is semantically correct.
