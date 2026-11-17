@@ -1,7 +1,9 @@
 # Sync Lifecycle Operation
 
-Use `sync` to mutate `.agents/contexts/` after a task only when durable
-repository knowledge changed.
+Use `sync` to mutate `.agents/contexts/` when a source-backed durable
+repository fact changes or an authorized operating convention is adopted.
+REFLECT may identify the delta, but a hook firing alone never authorizes SYNC.
+Read-only requests produce a proposal instead of a write.
 
 ## Durable Deltas
 
@@ -26,28 +28,39 @@ Do not sync for a small implementation bug fix, internal rename with no contract
 impact, temporary workaround, completed task history, a one-time test result, or
 details already clear from source.
 
-## Steps
+## Owner-first replace-before-append
 
-1. Identify the durable delta.
-2. Load affected shards only.
-3. Verify existing affected facts against the owning source. When source
-   artifacts conflict, resolve declared ownership/priority first; do not sync
-   whichever file merely changed last.
-4. Remove stale, duplicated, historical, overly detailed, or misplaced content.
-5. Add or rewrite durable current-state knowledge in `.agents/contexts/`.
-6. Preserve concise source references rather than copied detail.
-7. Update the managed Context Index only when routing changes. Existing folder
-   entries (trailing `/`) cover Markdown files added anywhere beneath them;
-   do not add one index line per child. Keep direct file routes when useful.
-   Keep the rest of the `AGENTS.md` managed block registration-only; do not
-   promote repository knowledge or conventions into it.
-8. Run `context_ops.py lint`.
-9. Run `context_ops.py validate`.
-10. Run `context_ops.py audit`.
-11. Resolve deterministic findings where possible.
+Current-state context is a **projection**, not a changelog. Before editing:
+
+1. Identify the fact's canonical owner, stable identity and applicable scope.
+   If it is an execution result, dataset identity, cleanup hold or in-flight
+   operation, defer to the project-owned resource; context may link to its policy.
+2. Load only the owning shard and directly relevant source. Establish source
+   authority **before** resolving contradictions; newest arrival is not
+   automatically the newest applicable state.
+3. Distinguish observation from interpretation. Where consequential, record
+   evidence pointer, observed time, branch/revision/environment, verification
+   procedure and who may adopt a policy. Last edited time is not verification.
+4. **Update/replace** the existing canonical statement or summary first. Create
+   a new entry only for a genuinely new fact or independently owned subject.
+   Do not append an execution history beneath the current projection.
+5. Preserve indispensable evidence and unresolved qualifications before
+   compacting obsolete narrative. Never assume Git retains ignored artifacts.
+6. Update the managed Context Index **only** when routing changes. Registered
+   folders cover nested Markdown shards; do not add an index line per child.
+   Keep `AGENTS.md` registration-only and do not alter text outside its markers.
+7. Run `context_ops.py lint`, `context_ops.py validate`, and advisory
+   `context_ops.py audit`. Distinguish new/relevant findings from accepted
+   existing warnings. Static checks do not establish semantic correctness.
+
+A verified fact may replace an obsolete assumption, but preserve a concise
+resolution and pointer in its canonical assumption owner when needed. A
+repeated, unverified assumption must not be silently promoted. See
+[assumptions.md](assumptions.md).
 
 Cleanup is part of sync. Do not run a separate cleanup flow unless maintenance
-conditions apply.
+conditions apply. Project-delegated operational resources retain their own
+writers, validation and retention; SYNC never becomes their state updater.
 
 ## Independent experience capture
 
