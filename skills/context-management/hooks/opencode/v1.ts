@@ -73,7 +73,7 @@ export const ContextManagementPlugin: Plugin = async ({ directory }) => {
 
     "tool.execute.after": async (input, output) => {
       if (!input.sessionID || !WRITE_TOOLS.has(String(input.tool).toLowerCase())) return
-      if (!isKnowledgeWrite(output.args)) pendingReflect.add(input.sessionID)
+      if (!isKnowledgeWrite(input.args)) pendingReflect.add(input.sessionID)
     },
   }
 }
