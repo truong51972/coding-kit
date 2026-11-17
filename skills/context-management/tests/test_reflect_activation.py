@@ -92,3 +92,16 @@ class ReflectionActivationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_missing_required_managed_headings_is_silent(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "AGENTS.md").write_text(
+        f"# Repo\n{START}\n## Context Management\n{END}\n", encoding="utf-8")
+    output = _run(
+        "claude-codex",
+        {"hook_event_name": "SessionStart", "source": "startup", "cwd": str(repo)},
+        repo,
+    )
+    assert output is None
