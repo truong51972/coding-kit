@@ -16,7 +16,7 @@ def _repo(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "AGENTS.md").write_text(
-        f"# Project\n{START}\n## Context Management\n{END}\n", encoding="utf-8")
+        f"# Project\n{START}\n## Context Management\n### Startup\n### Context Index\n### Project Working Conventions\n{END}\n", encoding="utf-8")
     return root
 
 
@@ -93,7 +93,7 @@ def test_invalid_marker_and_missing_session_are_silent(tmp_path: Path) -> None:
     root, home = _repo(tmp_path), tmp_path / "state"
     (root / "AGENTS.md").write_text(f"{START}\n{END}\n{START}\n{END}\n")
     assert _event(root, home, "claude", "Stop") is None
-    (root / "AGENTS.md").write_text(f"# Repo\n{START}\n{END}\n")
+    (root / "AGENTS.md").write_text(f"# Repo\n{START}\n## Context Management\n### Startup\n### Context Index\n### Project Working Conventions\n{END}\n")
     env = os.environ.copy()
     env["XDG_STATE_HOME"] = str(home)
     result = subprocess.run(
