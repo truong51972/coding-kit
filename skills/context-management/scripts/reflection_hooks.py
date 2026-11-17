@@ -82,7 +82,7 @@ def _memory_only(tool_input: Any) -> bool:
     patch = tool_input.get("patch") or tool_input.get("patch_text") or tool_input.get("patchText")
     if isinstance(patch, str):
         targets += re.findall(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", patch, re.M)
-    paths = [str(x).replace("\\", "/").lstrip("./") for x in targets if isinstance(x, str)]
+    paths = [str(x).replace("\\", "/").removeprefix("./") for x in targets if isinstance(x, str)]
     if not paths:
         return False
     return all(
