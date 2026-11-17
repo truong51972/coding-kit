@@ -217,7 +217,7 @@ def _event_template(provider: str, with_failure_guard: bool = False,
             raise HookError("missing reflection hook template")
         command = _command(provider + "-reflect")
         for event, groups in reflect.items():
-            if event not in ("PostToolUse", "Stop", "PreCompact") or not isinstance(groups, list):
+            if event not in ("PostToolUse", "Stop", "PreCompact", "UserPromptSubmit") or not isinstance(groups, list):
                 raise HookError("invalid reflection hook events")
             for group in groups:
                 for handler in group.get("hooks", []):
@@ -309,8 +309,8 @@ def _event_status(target: Path, provider: str) -> int:
                 for handler in group.get("hooks", []) if isinstance(group.get("hooks"), list)
             )
         }
-        expected = {"Stop", "PostToolUse"}
-        if provider == "claude" and expected.issubset(reflect_events):
+        expected = {"Stop", "PostToolUse", "UserPromptSubmit"}
+        if provider == "claude":
             expected.add("PreCompact")
         reflect_state = "registered" if expected.issubset(reflect_events) else "not registered"
         print(f"registered: Context Management hooks in {target}")
