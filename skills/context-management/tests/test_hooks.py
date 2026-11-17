@@ -14,7 +14,7 @@ END = "<!-- context-management:end -->"
 def _managed_repo(path: Path) -> Path:
     path.mkdir(parents=True, exist_ok=True)
     (path / "AGENTS.md").write_text(
-        f"# Repo\n\n{START}\n## Context Management\n{END}\n",
+        f"# Repo\n\n{START}\n## Context Management\n### Startup\n### Context Index\n### Project Working Conventions\n{END}\n",
         encoding="utf-8",
     )
     return path
