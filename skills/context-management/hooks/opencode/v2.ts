@@ -19,15 +19,27 @@ const WRITE_TOOLS = new Set(["write", "edit", "multiedit", "notebookedit", "appl
 function isKnowledgeWrite(args: unknown): boolean {
   if (!args || typeof args !== "object") return false
   const record = args as Record<string, unknown>
-  const target = record.filePath ?? record.file_path ?? record.path ?? record.notebook_path
-  const patch = record.patch ?? record.patchText ?? record.patch_text
-  const paths = typeof target === "string" ? [target] :
-    typeof patch === "string" ? Array.from(patch.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm), m => m[1]) : []
+  const paths: string[] = []
+  for (const key of ["filePath", "file_path", "path", "notebook_path"]) {
+    const value = record[key]
+    if (typeof value === "string") paths.push(value)
+  }
+
+  // Patch tools may update multiple files or move a memory file into source.
+  // Codex-style apply_patch payloads can arrive under "command".
+  const patch = record.patch ?? record.patchText ?? record.patch_text ?? record.command
+  if (typeof patch === "string") {
+    for (const match of patch.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$|^\*\*\* Move to: (.+)$/gm)) {
+      paths.push(match[1] ?? match[2])
+    }
+  }
+
   if (!paths.length) return false
   return paths.every(target => {
-    const path = target.replaceAll("\\", "/")
-    return ["/.agents/contexts/", "/.agents/experiences/", "/.agents/assumptions/"].some(x => path.includes(x)) ||
-      [".agents/contexts/", ".agents/experiences/", ".agents/assumptions/"].some(x => path.startsWith(x))
+    const path = target.replaceAll("\\", "/").replace(/^\.\/+/, "")
+    if (path.split("/").includes("..")) return false
+    return [".agents/contexts/", ".agents/experiences/", ".agents/assumptions/"]
+      .some(segment => path.startsWith(segment) || path.includes("/" + segment))
   })
 }
 
@@ -64,12 +76,11 @@ export default Plugin.define({
     await ctx.session.hook("context", (event) => {
       const key = `${event.sessionID}:${event.agent}`
       const afterCompaction = refreshAfterCompaction.delete(event.sessionID)
-      if (bootstrapped.has(key) && !afterCompaction && !pendingReflect.has(event.sessionID)) return
+      const firstContext = !bootstrapped.has(key)
+      if (!firstContext && !afterCompaction && !pendingReflect.has(event.sessionID)) return
 
-      event.system.push({
-        type: "text",
-        text: afterCompaction ? COMPACT_CONTEXT : BOOTSTRAP_CONTEXT,
-      })
+      if (afterCompaction) event.system.push({ type: "text", text: COMPACT_CONTEXT })
+      else if (firstContext) event.system.push({ type: "text", text: BOOTSTRAP_CONTEXT })
       bootstrapped.add(key)
       if (pendingReflect.delete(event.sessionID)) {
         event.system.push({ type: "text", text: REFLECT_PROMPT })
