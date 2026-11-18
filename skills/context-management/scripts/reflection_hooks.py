@@ -71,8 +71,8 @@ def _save(path: Path, data: dict[str, Any]) -> None:
             os.unlink(name)
 
 
-def _memory_only(tool_input: Any) -> bool:
-    """Known memory writes must not schedule a second reflection loop."""
+def _memory_only(tool_input: Any, *, patch_command: bool = False) -> bool:
+    """Ignore known memory-only edits; unknown or mixed targets stay eligible."""
     if not isinstance(tool_input, dict):
         return False
     targets = [
@@ -80,10 +80,16 @@ def _memory_only(tool_input: Any) -> bool:
         tool_input.get("notebook_path"),
     ]
     patch = tool_input.get("patch") or tool_input.get("patch_text") or tool_input.get("patchText")
+    if patch_command and not isinstance(patch, str):
+        # Codex PostToolUse uses tool_input.command for apply_patch, not .patch.
+        # Never treat arbitrary Bash command text as a patch.
+        patch = tool_input.get("command")
     if isinstance(patch, str):
         targets += re.findall(r"^\*\*\* (?:Add|Update|Delete) File: (.+)$", patch, re.M)
+        targets += re.findall(r"^\*\*\* Move to: (.+)$", patch, re.M)
     paths = [str(x).replace("\\", "/").removeprefix("./") for x in targets if isinstance(x, str)]
-    if not paths:
+    if not paths or any(".." in p.split("/") for p in paths):
+        # Missing targets or traversal-like paths must fail open to REFLECT.
         return False
     return all(
         any(("/" + p).find("/" + m) >= 0 for m in MEMORY_SEGMENTS)
@@ -146,15 +152,11 @@ def handle(root: Path, payload: dict[str, Any], host: str) -> dict[str, Any] | s
             if not touched:
                 return None
             if all(_memory_only({"path": p}) for p in touched):
-                if current.get("pending"):
-                    _save(path, {"pending": False, "requested": True,
-                                 "turn": turn or current.get("turn")})
+                # A memory edit is not proof that earlier source changes were
+                # reflected. Keep pending until the bounded Stop continuation.
                 return None
         elif tool in WRITE_TOOLS:
-            if _memory_only(payload.get("tool_input")):
-                if current.get("pending"):
-                    _save(path, {"pending": False, "requested": True,
-                                 "turn": turn or current.get("turn")})
+            if _memory_only(payload.get("tool_input"), patch_command=tool == "apply_patch"):
                 return None
         else:
             return None
