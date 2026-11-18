@@ -19,15 +19,27 @@ const WRITE_TOOLS = new Set(["write", "edit", "multiedit", "notebookedit", "appl
 function isKnowledgeWrite(args: unknown): boolean {
   if (!args || typeof args !== "object") return false
   const record = args as Record<string, unknown>
-  const target = record.filePath ?? record.file_path ?? record.path ?? record.notebook_path
-  const patch = record.patch ?? record.patchText ?? record.patch_text
-  const paths = typeof target === "string" ? [target] :
-    typeof patch === "string" ? Array.from(patch.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm), m => m[1]) : []
+  const paths: string[] = []
+  for (const key of ["filePath", "file_path", "path", "notebook_path"]) {
+    const value = record[key]
+    if (typeof value === "string") paths.push(value)
+  }
+
+  // Patch tools may update multiple files or move a memory file into source.
+  // Codex-style apply_patch payloads can arrive under "command".
+  const patch = record.patch ?? record.patchText ?? record.patch_text ?? record.command
+  if (typeof patch === "string") {
+    for (const match of patch.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$|^\*\*\* Move to: (.+)$/gm)) {
+      paths.push(match[1] ?? match[2])
+    }
+  }
+
   if (!paths.length) return false
   return paths.every(target => {
-    const path = target.replaceAll("\\", "/")
-    return ["/.agents/contexts/", "/.agents/experiences/", "/.agents/assumptions/"].some(x => path.includes(x)) ||
-      [".agents/contexts/", ".agents/experiences/", ".agents/assumptions/"].some(x => path.startsWith(x))
+    const path = target.replaceAll("\\", "/").replace(/^\.\/+/, "")
+    if (path.split("/").includes("..")) return false
+    return [".agents/contexts/", ".agents/experiences/", ".agents/assumptions/"]
+      .some(segment => path.startsWith(segment) || path.includes("/" + segment))
   })
 }
 
@@ -65,9 +77,11 @@ export const ContextManagementPlugin: Plugin = async ({ directory }) => {
       if (!sessionID) return
 
       const afterCompaction = refreshAfterCompaction.delete(sessionID)
-      if (bootstrapped.has(sessionID) && !afterCompaction && !pendingReflect.has(sessionID)) return
+      const firstContext = !bootstrapped.has(sessionID)
+      if (!firstContext && !afterCompaction && !pendingReflect.has(sessionID)) return
 
-      output.system.push(afterCompaction ? COMPACT_CONTEXT : BOOTSTRAP_CONTEXT)
+      if (afterCompaction) output.system.push(COMPACT_CONTEXT)
+      else if (firstContext) output.system.push(BOOTSTRAP_CONTEXT)
       bootstrapped.add(sessionID)
       if (pendingReflect.delete(sessionID)) output.system.push(REFLECT_PROMPT)
     },
