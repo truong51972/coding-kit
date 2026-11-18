@@ -78,6 +78,29 @@ def _parse(content: str) -> list[dict[str, str | int]]:
         items.append({"id": match.group(2), "claim": match.group(3).strip(),
                       "state": state, "start": match.start(), "end": matches[i + 1].start()
                       if i + 1 < len(matches) else len(content), **details})
+    # A successor starts a new evidence cycle without altering immutable
+    # resolved records. Check links even for hand-edited Markdown ledgers.
+    by_id = {str(item["id"]): item for item in items}
+    superseded: set[str] = set()
+    active: set[tuple[str, str]] = set()
+    for item in items:
+        if item["state"] == "provisional":
+            key = (str(item["claim"]).casefold(), str(item["Scope"]).casefold())
+            if key in active:
+                raise LedgerError(f"{item['id']}: duplicate active claim and scope")
+            active.add(key)
+        previous = item.get("Supersedes")
+        if previous is None:
+            continue
+        older = by_id.get(str(previous))
+        if older is None or older["state"] == "provisional" or int(older["start"]) >= int(item["start"]):
+            raise LedgerError(f"{item['id']}: Supersedes must reference an earlier resolved record")
+        if (str(older["claim"]).casefold(), str(older["Scope"]).casefold()) != (
+                str(item["claim"]).casefold(), str(item["Scope"]).casefold()):
+            raise LedgerError(f"{item['id']}: successor must preserve claim and scope")
+        if str(previous) in superseded:
+            raise LedgerError(f"{item['id']}: prior record already has a successor")
+        superseded.add(str(previous))
     return items
 
 
@@ -118,6 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("show").add_argument("id")
     capture = sub.add_parser("capture")
     capture.add_argument("--id")
+    capture.add_argument("--supersedes", help="resolved assumption ID to re-evaluate")
     for flag in ("claim", "scope", "decision", "basis", "verify-by", "owner"):
         capture.add_argument("--" + flag, required=True)
     resolve = sub.add_parser("resolve")
@@ -155,11 +179,30 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "capture":
             claim = _safe_text(args.claim)
             scope = _safe_text(args.scope)
-            same = next((e for e in entries if e["claim"].casefold() == claim.casefold()
-                         and e["Scope"].casefold() == scope.casefold()), None)
-            if same:
-                print(f"existing: {same['id']} (use the canonical record)")
+            matching = [
+                e for e in entries if str(e["claim"]).casefold() == claim.casefold()
+                and str(e["Scope"]).casefold() == scope.casefold()
+            ]
+            active = next((e for e in matching if e["state"] == "provisional"), None)
+            if active:
+                if args.supersedes and active.get("Supersedes") != args.supersedes:
+                    raise LedgerError("an active record already owns this claim and scope")
+                print(f"existing: {active['id']} (use the canonical record)")
                 return 0
+            prior = None
+            if args.supersedes:
+                prior = next((e for e in entries if e["id"] == args.supersedes), None)
+                if prior is None or prior["state"] == "provisional":
+                    raise LedgerError("--supersedes requires an existing resolved assumption")
+                if (str(prior["claim"]).casefold(), str(prior["Scope"]).casefold()) != (
+                        claim.casefold(), scope.casefold()):
+                    raise LedgerError("--supersedes must retain the prior claim and scope")
+                if any(e.get("Supersedes") == args.supersedes for e in entries):
+                    raise LedgerError("assumption already superseded; reference its latest successor")
+            elif matching:
+                latest = matching[-1]
+                raise LedgerError(f"{latest['id']} is resolved; use --supersedes {latest['id']} "
+                                  "to begin a new evidence cycle")
             ident = args.id or f"ASM-{max([int(str(e['id']).split('-')[1]) for e in entries] + [0]) + 1:03d}"
             if not re.fullmatch(r"ASM-\d{3,}", ident) or any(e["id"] == ident for e in entries):
                 raise LedgerError("invalid or duplicate assumption ID")
@@ -168,6 +211,8 @@ def main(argv: list[str] | None = None) -> int:
                        "Basis": _safe_text(args.basis),
                        "Verify by": _safe_text(args.verify_by),
                        "Owner": _safe_text(args.owner)}
+            if prior is not None:
+                details["Supersedes"] = str(prior["id"])
             new = content.rstrip() + "\n\n" + _render(ident, claim, details)
             _parse(new)
             _write(path, new)
