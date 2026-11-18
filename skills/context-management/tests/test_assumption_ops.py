@@ -163,3 +163,57 @@ def test_lint_rejects_broken_supersedes_link(tmp_path: Path) -> None:
     ledger.write_text(ledger.read_text().replace("Supersedes: ASM-001",
                                                  "Supersedes: ASM-999"))
     assert _run(root, "lint").returncode == 2
+
+
+def test_resolving_successor_preserves_immutable_provenance(tmp_path: Path) -> None:
+    for status in ("verified", "rejected", "retired"):
+        repo = tmp_path / status
+        repo.mkdir()
+        assert _run(repo, "init").returncode == 0
+        assert _capture(repo).returncode == 0
+        assert _run(repo, "resolve", "ASM-001", "--status", "rejected",
+                    "--evidence", "old deployment @ rev-A").returncode == 0
+        assert _capture(repo, supersedes="ASM-001",
+                        basis="new deployment @ rev-B").returncode == 0
+        before = _run(repo, "show", "ASM-002").stdout
+        assert "Supersedes: ASM-001" in before
+        args = ["resolve", "ASM-002", "--status", status]
+        if status != "retired":
+            args.extend(["--evidence", "deployment inspected @ rev-B"])
+        resolved = _run(repo, *args)
+        assert resolved.returncode == 0, resolved.stderr
+        after = _run(repo, "show", "ASM-002").stdout
+        assert "Supersedes: ASM-001" in after
+        assert "Status: " + status in after
+        assert _run(repo, "lint").returncode == 0
+
+        # The original may never branch into two different successors,
+        # even after its first successor has been resolved.
+        assert _capture(repo, supersedes="ASM-001").returncode == 2
+        assert _capture(repo, supersedes="ASM-002").returncode == 0
+        assert "Supersedes: ASM-002" in _run(repo, "show", "ASM-003").stdout
+        assert _run(repo, "lint").returncode == 0
+
+
+def test_lint_rejects_unparsed_ledger_preamble(tmp_path: Path) -> None:
+    repo = tmp_path
+    assert _run(repo, "init").returncode == 0
+    ledger = repo / ".agents/assumptions/ledger.md"
+    # Stray prose in a ledger with zero entries must not pass structural lint.
+    ledger.write_text("# Assumption Ledger\n\norphan note\n", encoding="utf-8")
+    assert _run(repo, "lint").returncode == 2
+
+    assert _run(repo, "init").returncode == 2
+    ledger.write_text("# Assumption Ledger\n\n", encoding="utf-8")
+    assert _capture(repo).returncode == 0
+    valid = ledger.read_text(encoding="utf-8")
+    ledger.write_text(valid.replace("# Assumption Ledger\n\n",
+                                    "# Assumption Ledger\n\nstray before first entry\n\n", 1),
+                      encoding="utf-8")
+    assert _run(repo, "lint").returncode == 2
+    assert _run(repo, "show", "ASM-001").returncode == 2
+    # Blank separators before the first entry remain valid.
+    ledger.write_text(valid.replace("# Assumption Ledger\n\n",
+                                    "# Assumption Ledger\n\n\n\n", 1),
+                      encoding="utf-8")
+    assert _run(repo, "lint").returncode == 0
