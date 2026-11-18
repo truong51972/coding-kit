@@ -191,9 +191,9 @@ def test_codex_apply_patch_command_memory_only_and_mixed_targets(tmp_path: Path)
     memory_patch = (
         "*** Begin Patch\n"
         "*** Update File: .agents/contexts/project-baseline.md\n"
-        "@@\\n-old\\n+new\n"
+        "@@\n-old\n+new\n"
         "*** End Patch\n"
-    ).replace("\\\n", "\n")
+    )
     _event(root, home, "codex", "PostToolUse", tool_name="apply_patch",
            tool_input={"command": memory_patch})
     assert _event(root, home, "codex", "Stop") is None
@@ -203,7 +203,7 @@ def test_codex_apply_patch_command_memory_only_and_mixed_targets(tmp_path: Path)
         "*** Update File: .agents/contexts/project-baseline.md\n"
         "*** Update File: src/main.py\n"
         "*** End Patch\n"
-    ).replace("\\\n", "\n")
+    )
     _event(root, home, "codex", "PostToolUse", tool_name="apply_patch",
            tool_input={"command": mixed_patch})
     assert _event(root, home, "codex", "Stop")["decision"] == "block"
@@ -217,10 +217,10 @@ def test_codex_apply_patch_move_and_ambiguous_paths_are_not_suppressed(tmp_path:
                "*** Update File: .agents/contexts/old.md\n"
                "*** Move to: src/new.md\n"
                "*** End Patch\n"
-           ).replace("\\\n", "\n")})
+           )})
     assert _event(root, home, "codex", "Stop")["decision"] == "block"
 
     _event(root, home, "codex", "UserPromptSubmit", prompt="Modify another file")
     _event(root, home, "codex", "PostToolUse", tool_name="apply_patch",
-           tool_input={"command": "*** Begin Patch\\n(no target headers)\\n*** End Patch"})
+           tool_input={"command": "*** Begin Patch\n(no target headers)\n*** End Patch"})
     assert _event(root, home, "codex", "Stop")["decision"] == "block"
