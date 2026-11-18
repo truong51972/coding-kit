@@ -103,3 +103,63 @@ def test_context_init_and_ledger_init_are_separate(tmp_path: Path) -> None:
                          cwd=root, text=True, capture_output=True, check=False)
     assert run.returncode == 0, run.stderr
     assert not (root / ".agents/assumptions").exists()
+
+
+def test_resolved_assumption_can_be_re_evaluated_with_explicit_successor(tmp_path: Path) -> None:
+    root = tmp_path
+    assert _run(root, "init").returncode == 0
+    assert _capture(root).returncode == 0
+    assert _run(root, "resolve", "ASM-001", "--status", "rejected",
+                "--evidence", "prod replicas=3 @ rev-A").returncode == 0
+    old = _run(root, "show", "ASM-001").stdout
+
+    # Dedup must not silently return an immutable rejected premise.
+    blocked = _capture(root)
+    assert blocked.returncode == 2
+    assert "--supersedes ASM-001" in blocked.stderr
+
+    next_record = _capture(root, supersedes="ASM-001",
+                           basis="new rollout @ rev-B; active replicas unknown")
+    assert next_record.returncode == 0, next_record.stderr
+    assert "captured: ASM-002" in next_record.stdout
+    assert "Status: provisional" in _run(root, "show", "ASM-002").stdout
+    assert "Supersedes: ASM-001" in _run(root, "show", "ASM-002").stdout
+    assert _run(root, "show", "ASM-001").stdout == old
+    assert _run(root, "lint").returncode == 0
+
+    # Replaying a capture remains idempotent and never forks the active owner.
+    assert "existing: ASM-002" in _capture(root, supersedes="ASM-001").stdout
+    assert _run(root, "list").stdout.count("ASM-002:") == 1
+
+    # A resolved successor may itself be superseded; the old chain is immutable.
+    assert _run(root, "resolve", "ASM-002", "--status", "verified",
+                "--evidence", "prod replicas=1 @ rev-B").returncode == 0
+    newest = _capture(root, supersedes="ASM-002",
+                      basis="replica autoscaling proposed @ rev-C")
+    assert newest.returncode == 0 and "ASM-003" in newest.stdout
+    assert _run(root, "lint").returncode == 0
+    assert _capture(root, supersedes="ASM-001").returncode == 2
+
+
+def test_supersession_rejects_unrelated_or_unresolved_records(tmp_path: Path) -> None:
+    root = tmp_path
+    assert _run(root, "init").returncode == 0
+    assert _capture(root).returncode == 0
+    assert _capture(root, supersedes="ASM-001").returncode == 2
+    assert _capture(root, supersedes="ASM-999").returncode == 2
+    assert _run(root, "resolve", "ASM-001", "--status", "retired").returncode == 0
+    assert _capture(root, supersedes="ASM-001", scope="worker / staging").returncode == 2
+    assert _capture(root, supersedes="ASM-001", claim="Different premise").returncode == 2
+    assert _run(root, "lint").returncode == 0
+
+
+def test_lint_rejects_broken_supersedes_link(tmp_path: Path) -> None:
+    root = tmp_path
+    assert _run(root, "init").returncode == 0
+    assert _capture(root).returncode == 0
+    assert _run(root, "resolve", "ASM-001", "--status", "retired").returncode == 0
+    assert _capture(root, supersedes="ASM-001").returncode == 0
+    ledger = root / ".agents/assumptions/ledger.md"
+    ledger.write_text(ledger.read_text().replace("Supersedes: ASM-001",
+                                                 "Supersedes: ASM-999"))
+    assert _run(root, "lint").returncode == 2
