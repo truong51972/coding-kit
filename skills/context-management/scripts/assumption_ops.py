@@ -53,8 +53,11 @@ def _parse(content: str) -> list[dict[str, str | int]]:
     matches = list(ENTRY.finditer(content))
     items: list[dict[str, str | int]] = []
     seen: set[str] = set()
-    if not matches and content.strip() != HEADER.strip():
-        raise LedgerError("unrecognized ledger content")
+    # Every non-whitespace byte after the header must belong to a parsed
+    # entry. Otherwise stray prose before the first item silently passes lint.
+    first_start = matches[0].start() if matches else len(content)
+    if content[len(HEADER):first_start].strip():
+        raise LedgerError("unrecognized ledger content before first assumption")
     for i, match in enumerate(matches):
         entry = content[match.end():matches[i + 1].start() if i + 1 < len(matches) else len(content)]
         details: dict[str, str] = {}
@@ -229,7 +232,12 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"unchanged: {args.id}")
                     return 0
                 raise LedgerError("resolved assumption is immutable; add a new scoped record")
-            details = {key: str(item[key]) for key in FIELDS}
+            # Preserve all existing metadata, especially Supersedes: an
+            # immutable successor must retain its provenance when resolved.
+            details = {
+                key: str(value) for key, value in item.items()
+                if key not in {"id", "claim", "state", "start", "end"}
+            }
             details["Status"] = args.status
             if args.evidence:
                 details["Evidence"] = _safe_text(args.evidence)
