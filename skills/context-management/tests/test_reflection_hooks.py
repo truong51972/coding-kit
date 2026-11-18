@@ -154,14 +154,73 @@ def test_claude_shell_requires_observed_changed_files(tmp_path: Path) -> None:
     assert _event(root, home, "claude", "Stop")["decision"] == "block"
 
 
-def test_already_synced_memory_suppresses_redundant_stop(tmp_path: Path) -> None:
+def test_memory_write_does_not_discard_pending_source_changes(tmp_path: Path) -> None:
     root, home = _repo(tmp_path), tmp_path / "state"
     _event(root, home, "claude", "PostToolUse", tool_name="Edit",
            tool_input={"file_path": "src/main.py"})
+    # A normal context update might be incomplete or precede more source edits.
     _event(root, home, "claude", "PostToolUse", tool_name="Write",
            tool_input={"file_path": ".agents/contexts/project-baseline.md"})
-    assert _event(root, home, "claude", "Stop") is None
-    _event(root, home, "claude", "UserPromptSubmit", prompt="Continue feature work")
     _event(root, home, "claude", "PostToolUse", tool_name="Edit",
            tool_input={"file_path": "src/other.py"})
     assert _event(root, home, "claude", "Stop")["decision"] == "block"
+    assert _event(root, home, "claude", "Stop") is None
+    assert _event(root, home, "claude", "Stop", stop_hook_active=True) is None
+
+    # A later turn that touches only memory does not re-arm the Stop hook.
+    _event(root, home, "claude", "UserPromptSubmit", prompt="Reword a context entry")
+    _event(root, home, "claude", "PostToolUse", tool_name="Write",
+           tool_input={"file_path": ".agents/contexts/project-baseline.md"})
+    assert _event(root, home, "claude", "Stop") is None
+
+
+def test_claude_shell_memory_write_does_not_discard_pending(tmp_path: Path) -> None:
+    root, home = _repo(tmp_path), tmp_path / "state"
+    _event(root, home, "claude", "PostToolUse", tool_name="Edit",
+           tool_input={"file_path": "src/core.py"})
+    _event(root, home, "claude", "PostToolUse", tool_name="Bash",
+           tool_input={"command": "python memory-sync.py"},
+           tool_response={"bashEditDiff": {"changedFiles": [
+               ".agents/contexts/project-baseline.md"]}})
+    assert _event(root, home, "claude", "Stop")["decision"] == "block"
+
+
+def test_codex_apply_patch_command_memory_only_and_mixed_targets(tmp_path: Path) -> None:
+    root, home = _repo(tmp_path), tmp_path / "state"
+    # Codex exposes apply_patch through tool_input.command, not .patch.
+    memory_patch = (
+        "*** Begin Patch\n"
+        "*** Update File: .agents/contexts/project-baseline.md\n"
+        "@@\\n-old\\n+new\n"
+        "*** End Patch\n"
+    ).replace("\\\n", "\n")
+    _event(root, home, "codex", "PostToolUse", tool_name="apply_patch",
+           tool_input={"command": memory_patch})
+    assert _event(root, home, "codex", "Stop") is None
+
+    mixed_patch = (
+        "*** Begin Patch\n"
+        "*** Update File: .agents/contexts/project-baseline.md\n"
+        "*** Update File: src/main.py\n"
+        "*** End Patch\n"
+    ).replace("\\\n", "\n")
+    _event(root, home, "codex", "PostToolUse", tool_name="apply_patch",
+           tool_input={"command": mixed_patch})
+    assert _event(root, home, "codex", "Stop")["decision"] == "block"
+
+
+def test_codex_apply_patch_move_and_ambiguous_paths_are_not_suppressed(tmp_path: Path) -> None:
+    root, home = _repo(tmp_path), tmp_path / "state"
+    _event(root, home, "codex", "PostToolUse", tool_name="apply_patch",
+           tool_input={"command": (
+               "*** Begin Patch\n"
+               "*** Update File: .agents/contexts/old.md\n"
+               "*** Move to: src/new.md\n"
+               "*** End Patch\n"
+           ).replace("\\\n", "\n")})
+    assert _event(root, home, "codex", "Stop")["decision"] == "block"
+
+    _event(root, home, "codex", "UserPromptSubmit", prompt="Modify another file")
+    _event(root, home, "codex", "PostToolUse", tool_name="apply_patch",
+           tool_input={"command": "*** Begin Patch\\n(no target headers)\\n*** End Patch"})
+    assert _event(root, home, "codex", "Stop")["decision"] == "block"
