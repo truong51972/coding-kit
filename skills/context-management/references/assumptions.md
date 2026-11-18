@@ -61,6 +61,14 @@ every assumption in `AGENTS.md`.
 - **rejected**: contradicted for the recorded scope, with evidence.
 - **retired**: superseded, no longer relevant, or replaced; not necessarily false.
 
+To re-evaluate a **resolved** premise in the same scope after new evidence or
+source revision, create a new `provisional` record with an explicit
+`Supersedes: ASM-###` pointer. Do not re-open or rewrite an immutable verified,
+rejected or retired record. Only the latest unresolved successor is active;
+each resolved record may have at most one direct successor. A previously
+verified fact remains supported only for its documented scope/revision, and
+creating a new provisional record does not revoke or re-promote it by itself.
+
 An **accepted operating assumption** is an authority-granted disposition and
 remains explicitly uncertain where the evidence is insufficient.
 
@@ -105,9 +113,17 @@ python3 scripts/assumption_ops.py --repo . resolve ASM-001 \
 python3 scripts/assumption_ops.py --repo . lint
 ```
 
+For an assumption that was previously resolved, repeat the `capture` command
+with updated `--basis` and `--verify-by` plus `--supersedes ASM-001`.
+The claim and scope must match the earlier record; use a distinct scope for
+independent environments. `capture` is idempotent for the current provisional
+record and rejects an already resolved claim without explicit supersession.
+`lint` validates the successor chain, including dangling links or branches.
+
 `--ledger <relative-path.md>` can select a project-designated location
-outside canonical Context/Experience storage. Capture is idempotent for
-matching scoped claims; resolve replaces the record and requires evidence
+outside canonical Context/Experience storage. Capture deduplicates active
+matching scoped claims; a later evidence cycle explicitly supersedes a resolved
+record. Resolve replaces only a provisional record and requires evidence
 for verified/rejected status. Resolved records are immutable. CLI lint checks
 structure, **not** whether evidence is true. It never promotes into durable
 context automatically; an authorized agent must perform scoped SYNC.
