@@ -41,7 +41,7 @@ npx skills add truong51972/coding-kit --skill '*' -a codex -g -y
 | Skill | Use it for |
 | --- | --- |
 | [`celery-worker`](skills/celery-worker/SKILL.md) | Celery task boundaries, acknowledgements, retries, broker routing, Django producers, worker lifecycle, and integration tests. |
-| [`context-management`](skills/context-management/SKILL.md) | Lazy-loaded repository context, verified historical experiences, semantic audit, sync, maintenance, and optional continuity/failure-guard hooks. |
+| [`context-management`](skills/context-management/SKILL.md) | Lazy-loaded repository context, proactive REFLECT, decision-relevant assumptions, verified experiences, Smart SYNC, and optional continuity/failure-guard hooks. |
 | [`dependency-injection`](skills/dependency-injection/SKILL.md) | Python DI and resource lifecycle across FastAPI, Celery, CLI entry points, and test overrides. |
 | [`drf-api-architecture`](skills/drf-api-architecture/SKILL.md) | Django REST Framework API boundaries, serializers, scoped object access, workflows, asynchronous job endpoints, and contracts. |
 | [`python-monorepo-architecture`](skills/python-monorepo-architecture/SKILL.md) | Python app/package boundaries, `uv` dependency management, Dockerfiles, Compose, and monorepo layouts. |
@@ -68,7 +68,7 @@ Use `npx skills update` for the interactive project/global update flow, or `npx 
 
 ## Optional integrations
 
-**Context Management** is a repo-level workflow, not an automatically populated memory database. Its activation uses a managed marker/Context Index in the target repository's `AGENTS.md`, with lazy-loaded current-state shards in `.agents/contexts/`. Follow [`init.md`](skills/context-management/references/init.md) for first-time setup. Optional host hooks re-surface routing after startup, subagent creation, or compaction; see the [hook setup guide](skills/context-management/references/hooks.md).
+**Context Management** is a repo-level knowledge workflow, not an automatically populated memory database. Its REFLECT procedure proactively evaluates meaningful knowledge deltas (including consequential unverified assumptions) and chooses NO_CHANGE, SYNC or verified experience capture. REFLECT is an agent procedure, not an execution checkpoint. Optional, bounded Stop hooks are available for Codex/Claude, and OpenCode plugins add inline reflection reminders after supported write tools. Its activation uses a managed marker/Context Index in the target repository's `AGENTS.md`, with lazy-loaded current-state shards in `.agents/contexts/`. Follow [`init.md`](skills/context-management/references/init.md) for first-time setup. Optional host hooks re-surface routing after startup, subagent creation, or compaction; see the [hook setup guide](skills/context-management/references/hooks.md).
 
 **Verified Experiences** are now managed by `context-management`, **not installed as a separate skill**. Historical lessons remain in the target repository's `.agents/experiences/` or optional personal `$AGENTS_HOME/experiences/` notebook. The standard-library `experience_ops.py` supports metadata-first lookup, capture, lint, and retirement:
 
@@ -78,6 +78,18 @@ python3 ~/.agents/skills/context-management/scripts/experience_ops.py lint
 ```
 
 The optional Claude Code post-tool failure guard only *advises* after repeated matching failures; it never blocks commands or automatically captures experiences. Enable it explicitly with `hook_ops.py claude install --with-failure-guard`. For applicability, source authority, and host support, see [experience guidance](skills/context-management/references/experiences.md) and [hook setup](skills/context-management/references/hooks.md).
+
+To opt in to Stop-based REFLECT after installing the skill, register the host's
+adapter (this is deliberately not enabled automatically):
+
+```sh
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py codex install --with-reflect
+python3 ~/.agents/skills/context-management/scripts/hook_ops.py claude install --with-reflect
+```
+
+For optional cross-task assumption tracking, initialize a Markdown ledger
+explicitly with `assumption_ops.py --repo . init`; provisional assumptions
+are **not** automatically promoted to facts.
 
 Installing a skill with `npx skills` installs its files; **it does not necessarily register runtime hooks** in Codex, Claude Code, OpenCode, or other hosts. Hook commands and paths depend on the agent, installation scope, and platform. Resolve the actual installed skill directory before configuring hooks. Do not assume that Claude's `PostToolUse` hook contract is available in Codex or T3 Code.
 

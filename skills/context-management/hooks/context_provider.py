@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -47,9 +48,27 @@ def _contains_managed_block(path: Path) -> bool:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return False
-    start = text.find(MANAGED_BLOCK_START)
-    end = text.find(MANAGED_BLOCK_END)
-    return start >= 0 and end > start
+    # A partial/duplicated registration must not activate the skill. The
+    # deterministic context validator requires exactly one ordered marker pair;
+    # keep the lightweight hook probe consistent with that contract.
+    if text.count(MANAGED_BLOCK_START) != 1 or text.count(MANAGED_BLOCK_END) != 1:
+        return False
+    start = text.index(MANAGED_BLOCK_START) + len(MANAGED_BLOCK_START)
+    end = text.index(MANAGED_BLOCK_END)
+    if end < start:
+        return False
+    # Keep the activation probe compatible with context_ops.managed_block.
+    block = text[start:end]
+    headings = (
+        ("##", "Context Management"),
+        ("###", "Startup"),
+        ("###", "Context Index"),
+        ("###", "Project Working Conventions"),
+    )
+    return all(
+        re.search(rf"^{re.escape(level)}\s+{re.escape(title)}\s*$", block, re.MULTILINE)
+        for level, title in headings
+    )
 
 
 def _managed_root(starts: list[str]) -> Path | None:
@@ -113,6 +132,17 @@ def _claude_codex(payload: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
+def _reflect(payload: dict[str, Any], host: str) -> dict[str, Any] | str | None:
+    """Opt-in event bridge. Semantic memory writes remain agent-owned."""
+    root = _managed_root(_starts_for(payload))
+    if root is None:
+        return None
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from reflection_hooks import handle
+
+    return handle(root, payload, host)
+
+
 def _antigravity(payload: dict[str, Any]) -> dict[str, Any]:
     # Antigravity has no SessionStart/compact event. PreInvocation is therefore used
     # only for invocation 0; later invocations remain a no-op despite the host calling
@@ -126,7 +156,11 @@ def _antigravity(payload: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", choices=("claude-codex", "antigravity"), required=True)
+    parser.add_argument(
+        "--host",
+        choices=("claude-codex", "antigravity", "claude-reflect", "codex-reflect"),
+        required=True,
+    )
     args = parser.parse_args()
 
     try:
@@ -137,13 +171,17 @@ def main() -> int:
     if not isinstance(payload, dict):
         return 0
 
-    output: dict[str, Any] | None
+    output: dict[str, Any] | str | None
     if args.host == "claude-codex":
         output = _claude_codex(payload)
-    else:
+    elif args.host == "antigravity":
         output = _antigravity(payload)
+    else:
+        output = _reflect(payload, args.host.split("-")[0])
 
-    if output is not None:
+    if isinstance(output, str):
+        sys.stdout.write(output)
+    elif output is not None:
         sys.stdout.write(json.dumps(output, separators=(",", ":")))
     return 0
 

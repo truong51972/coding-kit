@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|apply_patch|Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host claude-reflect",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host claude-reflect",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host claude-reflect",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AGENTS_HOME:-$HOME/.agents}/skills/context-management/hooks/context_provider.py\" --host claude-reflect",
+            "timeout": 3
+          }
+        ]
+      }
+    ]
+  }
+}

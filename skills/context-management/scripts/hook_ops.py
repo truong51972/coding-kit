@@ -20,6 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 PROVIDER = ROOT / "hooks" / "context_provider.py"
 CLAUDE_CODEX = ROOT / "hooks" / "claude-codex-hooks.json"
 CLAUDE_FAILURE_GUARD = ROOT / "hooks" / "claude-failure-guard-hooks.json"
+REFLECT_TEMPLATES = {
+    "codex": ROOT / "hooks" / "codex-reflect-hooks.json",
+    "claude": ROOT / "hooks" / "claude-reflect-hooks.json",
+}
 ANTIGRAVITY = ROOT / "hooks" / "antigravity-hooks.json"
 OPENCODE = {1: ROOT / "hooks" / "opencode" / "v1.ts", 2: ROOT / "hooks" / "opencode" / "v2.ts"}
 
@@ -178,7 +182,8 @@ def _strip_event_hooks(config: dict[str, Any], host: str) -> tuple[dict[str, Any
     return updated, removed
 
 
-def _event_template(with_failure_guard: bool = False) -> dict[str, list[Any]]:
+def _event_template(provider: str, with_failure_guard: bool = False,
+                    with_reflect: bool = False) -> dict[str, list[Any]]:
     template = _load_template(CLAUDE_CODEX)
     hooks = copy.deepcopy(template.get("hooks"))
     if not isinstance(hooks, dict):
@@ -204,6 +209,20 @@ def _event_template(with_failure_guard: bool = False) -> dict[str, list[Any]]:
                 for handler in group.get("hooks", []):
                     if not _is_managed(handler, "claude-codex"):
                         raise HookError("unexpected failure guard handler")
+                    handler["command"] = command
+            hooks.setdefault(event, []).extend(copy.deepcopy(groups))
+    if with_reflect:
+        reflect = _load_template(REFLECT_TEMPLATES[provider]).get("hooks")
+        if not isinstance(reflect, dict):
+            raise HookError("missing reflection hook template")
+        command = _command(provider + "-reflect")
+        for event, groups in reflect.items():
+            if event not in ("PostToolUse", "Stop", "PreCompact", "UserPromptSubmit") or not isinstance(groups, list):
+                raise HookError("invalid reflection hook events")
+            for group in groups:
+                for handler in group.get("hooks", []):
+                    if not _is_managed(handler, provider + "-reflect"):
+                        raise HookError("unexpected reflection handler")
                     handler["command"] = command
             hooks.setdefault(event, []).extend(copy.deepcopy(groups))
     return hooks
@@ -240,12 +259,15 @@ def _strip_old_experience_hooks(config: dict[str, Any]) -> dict[str, Any]:
     return config
 
 
-def _event_install(target: Path, with_failure_guard: bool = False) -> int:
+def _event_install(target: Path, provider: str, with_failure_guard: bool = False,
+                   with_reflect: bool = False) -> int:
     try:
         current = _load_json(target)
         updated, removed = _strip_event_hooks(current, "claude-codex")
+        updated, refl_removed = _strip_event_hooks(updated, provider + "-reflect")
+        removed += refl_removed
         updated = _strip_old_experience_hooks(updated)
-        desired = _event_template(with_failure_guard)
+        desired = _event_template(provider, with_failure_guard, with_reflect)
         hooks = updated.setdefault("hooks", {})
         if not isinstance(hooks, dict):
             raise HookError("existing 'hooks' field must be an object")
@@ -260,7 +282,7 @@ def _event_install(target: Path, with_failure_guard: bool = False) -> int:
     return 0
 
 
-def _event_status(target: Path) -> int:
+def _event_status(target: Path, provider: str) -> int:
     try:
         config = _load_json(target)
     except HookError as exc:
@@ -278,16 +300,32 @@ def _event_status(target: Path) -> int:
         if not PROVIDER.is_file():
             print(f"broken: provider missing: {PROVIDER}")
             return 2
-        print(f"installed: Context Management hooks in {target}")
+        reflect_events = {
+            event
+            for event, groups in config.get("hooks", {}).items()
+            if any(
+                _is_managed(handler, provider + "-reflect")
+                for group in groups if isinstance(group, dict)
+                for handler in group.get("hooks", []) if isinstance(group.get("hooks"), list)
+            )
+        }
+        expected = {"Stop", "PostToolUse", "UserPromptSubmit"}
+        if provider == "claude":
+            expected.add("PreCompact")
+        reflect_state = "registered" if expected.issubset(reflect_events) else "not registered"
+        print(f"registered: Context Management hooks in {target}")
+        print(f"reflection: {reflect_state} (runtime execution NOT verified)")
         return 0
     print(f"{'partial' if events else 'not installed'}: Context Management hooks in {target}")
     return 1
 
 
-def _event_remove(target: Path) -> int:
+def _event_remove(target: Path, provider: str) -> int:
     try:
         current = _load_json(target)
         updated, removed = _strip_event_hooks(current, "claude-codex")
+        updated, refl_removed = _strip_event_hooks(updated, provider + "-reflect")
+        removed += refl_removed
         if removed:
             _write_json(target, updated)
     except (HookError, OSError) as exc:
@@ -555,11 +593,11 @@ def _interactive() -> tuple[str, str, str, int | None]:
 
 
 def _run(provider: str, operation: str, target: Path, major: int | None = None,
-         with_failure_guard: bool = False) -> int:
+         with_failure_guard: bool = False, with_reflect: bool = False) -> int:
     if provider in ("codex", "claude"):
         if operation == "install":
-            return _event_install(target, with_failure_guard)
-        return {"status": _event_status, "remove": _event_remove}[operation](target)
+            return _event_install(target, provider, with_failure_guard, with_reflect)
+        return {"status": _event_status, "remove": _event_remove}[operation](target, provider)
     if provider == "antigravity":
         return _antigravity_run(operation, target)
     return _opencode_run(operation, target, major)
@@ -586,9 +624,13 @@ def main() -> int:
     parser.add_argument("--opencode-major", type=int, choices=(1, 2))
     parser.add_argument("--with-failure-guard", action="store_true",
                         help="opt in to Claude Bash post-tool loop detection")
+    parser.add_argument("--with-reflect", action="store_true",
+                        help="install bounded opt-in REFLECT hooks for Codex/Claude")
     args = parser.parse_args()
     if args.with_failure_guard and (args.provider != "claude" or args.operation != "install"):
         parser.error("--with-failure-guard only supports 'claude install'")
+    if args.with_reflect and (args.provider not in ("claude", "codex") or args.operation != "install"):
+        parser.error("--with-reflect only supports 'codex install' or 'claude install'")
 
     scope = _scope(args.scope)
     if args.codex_home and (args.provider != "codex" or scope == "project"):
@@ -600,7 +642,7 @@ def main() -> int:
         codex_home=args.codex_home,
     )
     return _run(args.provider, args.operation, target, args.opencode_major,
-                with_failure_guard=args.with_failure_guard)
+                with_failure_guard=args.with_failure_guard, with_reflect=args.with_reflect)
 
 
 if __name__ == "__main__":

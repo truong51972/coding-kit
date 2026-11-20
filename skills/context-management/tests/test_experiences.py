@@ -154,7 +154,7 @@ class ExperienceTests(unittest.TestCase):
         self.assertEqual(self.capture().returncode, 0)
         repo_file = self.repo / "AGENTS.md"
         repo_file.write_text(
-            "<!-- context-management:start -->\nIndex\n<!-- context-management:end -->\n")
+            "<!-- context-management:start -->\n## Context Management\n### Startup\n### Context Index\n### Project Working Conventions\n<!-- context-management:end -->\n")
         from importlib.util import spec_from_file_location, module_from_spec
         spec = spec_from_file_location("context_provider",
                                        SKILL / "hooks/context_provider.py")
